@@ -224,13 +224,13 @@ Las instrucciones para cada sección son:
 
         # ---- Consulta a la api de OPEN.IA ----
         gpt_response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "Eres un experto en estadística."},
                 {"role": "user", "content": prompt.strip()}
             ],
             temperature=0.4,
-            max_tokens=4096
+            max_tokens=1500
         )
 
         return {

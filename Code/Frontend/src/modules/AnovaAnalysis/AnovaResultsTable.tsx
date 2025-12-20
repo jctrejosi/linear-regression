@@ -30,10 +30,10 @@ export const AnovaResultsTable = ({ result, data }: Props) => {
         <thead className="bg-gray-100">
           <tr>
             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
-              Grupo
+              Variable
             </th>
             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
-              Datos del grupo
+              Datos de la variable
             </th>
             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
               Media
@@ -63,7 +63,7 @@ export const AnovaResultsTable = ({ result, data }: Props) => {
             return (
               <tr key={colIndex} className="hover:bg-gray-50 transition">
                 <td className="px-4 py-2 text-sm text-gray-700">{grupo}</td>
-                <td className="px-4 py-2 text-sm text-gray-700">
+                <td className="px-4 py-2 text-sm text-gray-700 max-w-xs overflow-x-auto whitespace-nowrap">
                   {valoresStr}
                 </td>
                 <td className="px-4 py-2 text-sm text-gray-700">

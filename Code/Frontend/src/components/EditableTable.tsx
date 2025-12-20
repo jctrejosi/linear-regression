@@ -1,5 +1,6 @@
 import type { TableFile } from "@/@types";
 import { useRef } from "react";
+import { FiTrash2 } from "react-icons/fi";
 
 interface EditableTableProps {
   columns: string[];
@@ -50,12 +51,22 @@ export const EditableTable = ({
   };
 
   const deleteColumn = (colIndex: number) => {
+    const confirmDelete = confirm(
+      `¿Seguro que deseas eliminar la columna "${columns[colIndex]}"?`
+    );
+    if (!confirmDelete) return;
+
     const newColumns = columns.filter((_, i) => i !== colIndex);
     const newData = data.map((row) => row.filter((_, i) => i !== colIndex));
     setData({ columns: newColumns, data: newData });
   };
 
   const deleteRow = (rowIndex: number) => {
+    const confirmDelete = confirm(
+      `¿Seguro que deseas eliminar la fila ${rowIndex + 1}?`
+    );
+    if (!confirmDelete) return;
+
     const newData = data.filter((_, i) => i !== rowIndex);
     setData({ columns, data: newData });
   };
@@ -104,10 +115,10 @@ export const EditableTable = ({
                     <span>{col}</span>
                     <button
                       onClick={() => deleteColumn(i)}
-                      className="text-red-500 hover:text-red-700 font-bold ml-2"
+                      className="text-red-500 hover:text-red-700"
                       title={`Eliminar columna "${col}"`}
                     >
-                      X
+                      <FiTrash2 />
                     </button>
                   </div>
                 </th>
@@ -134,10 +145,10 @@ export const EditableTable = ({
                 <td className="px-2 py-1">
                   <button
                     onClick={() => deleteRow(rowIndex)}
-                    className="text-red-500 hover:text-red-700 font-bold"
+                    className="text-red-500 hover:text-red-700"
                     title={`Eliminar fila ${rowIndex + 1}`}
                   >
-                    X
+                    <FiTrash2 />
                   </button>
                 </td>
               </tr>
