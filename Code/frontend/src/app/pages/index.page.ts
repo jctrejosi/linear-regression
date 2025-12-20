@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js';
+import 'chartjs-adapter-date-fns';
 
 import { CoinService, Coin } from './index/services/coin.service';
 import {
@@ -42,10 +43,8 @@ export default class IndexPage implements OnInit {
         type: 'time',
         time: {
           unit: 'day',
+          tooltipFormat: 'yyyy-MM-dd',
         },
-      },
-      y: {
-        beginAtZero: false,
       },
     },
   };
@@ -99,8 +98,12 @@ export default class IndexPage implements OnInit {
         labels = rates.map((r) => r.rateDate);
       }
 
+      const coin = this.coins().find((c) => c.id === Number(coinId));
+      const label = coin ? `${coin.name} (${coin.code})` : `coin ${coinId}`;
+
       datasets.push({
-        label: `coin ${coinId}`,
+        type: 'line',
+        label,
         data: rates.map((r) => r.rateToUsd),
         tension: 0.25,
       });
