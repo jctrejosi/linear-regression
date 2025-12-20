@@ -8,7 +8,7 @@ type Props = {
 
 export const AnovaResultsTable = ({ result, data }: Props) => {
   if (!result || !data) {
-    return <p>No hay resultados para mostrar.</p>;
+    return <p className="text-gray-500">No hay resultados para mostrar.</p>;
   }
 
   // Transponer data.data (filas → columnas)
@@ -25,18 +25,28 @@ export const AnovaResultsTable = ({ result, data }: Props) => {
   });
 
   return (
-    <div>
-      <table>
-        <thead>
+    <div className="overflow-x-auto">
+      <table className="min-w-full border border-gray-300 divide-y divide-gray-200 rounded-lg">
+        <thead className="bg-gray-100">
           <tr>
-            <th>Grupo</th>
-            <th>Datos del grupo</th>
-            <th>Media</th>
-            <th>SSE</th>
-            <th>SSB</th>
+            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+              Grupo
+            </th>
+            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+              Datos del grupo
+            </th>
+            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+              Media
+            </th>
+            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+              SSE
+            </th>
+            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+              SSB
+            </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="bg-white divide-y divide-gray-200">
           {columnas.map((colData, colIndex) => {
             const grupo = data.columns[colIndex];
             const valores = colData.filter((v) => v !== null && v !== "") as (
@@ -51,21 +61,29 @@ export const AnovaResultsTable = ({ result, data }: Props) => {
             const ssb_str = result.ssb_string[colIndex];
 
             return (
-              <tr key={colIndex}>
-                <td>{grupo}</td>
-                <td>{valoresStr}</td>
-                <td>{media !== undefined ? media.toFixed(2) : "—"}</td>
-                <td title={sse_str}>{sse}</td>
-                <td title={ssb_str}>{ssb}</td>
+              <tr key={colIndex} className="hover:bg-gray-50 transition">
+                <td className="px-4 py-2 text-sm text-gray-700">{grupo}</td>
+                <td className="px-4 py-2 text-sm text-gray-700">
+                  {valoresStr}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-700">
+                  {media !== undefined ? media.toFixed(2) : "—"}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-700" title={sse_str}>
+                  {sse}
+                </td>
+                <td className="px-4 py-2 text-sm text-gray-700" title={ssb_str}>
+                  {ssb}
+                </td>
               </tr>
             );
           })}
-          <tr>
-            <td></td>
-            <td></td>
-            <td>{result.global_mean}</td>
-            <td>{result.sse_total}</td>
-            <td>{result.ssb_total}</td>
+          <tr className="bg-gray-50 font-semibold">
+            <td className="px-4 py-2">Total / Global</td>
+            <td className="px-4 py-2"></td>
+            <td className="px-4 py-2">{result.global_mean}</td>
+            <td className="px-4 py-2">{result.sse_total}</td>
+            <td className="px-4 py-2">{result.ssb_total}</td>
           </tr>
         </tbody>
       </table>
