@@ -18,6 +18,7 @@ def file_converter(file):
             df = pd.read_csv(temp_path)
 
         elif ext == '.xlsx':
+            print('entró por acá')
             # Formato moderno de Excel
             df = pd.read_excel(temp_path, engine='openpyxl')
 

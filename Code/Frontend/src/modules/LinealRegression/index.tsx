@@ -1,5 +1,5 @@
 import type { TableFile } from "@/@types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   set_regression,
@@ -15,16 +15,29 @@ export const LinealRegresion = ({ data }: props) => {
   const [result, setResult] = useState<RegressionResponse>(
     {} as RegressionResponse
   );
+  const [dependent, setDependent] = useState<string>("");
+
+  // Inicializar dependent con la primera columna disponible
+  useEffect(() => {
+    if (data?.columns && data.columns.length > 0) {
+      setDependent(data.columns[0]);
+    }
+  }, [data]);
 
   const handleSend = async () => {
     if (!data || !data.columns || !data.data) {
       alert("No hay datos para enviar.");
       return;
     }
+    if (!dependent) {
+      alert("Seleccione la columna a analizar.");
+      return;
+    }
     try {
       const response = await set_regression({
         columns: data.columns,
         data: data.data,
+        dependent,
       });
       setResult(response);
       setView(true);
@@ -39,12 +52,30 @@ export const LinealRegresion = ({ data }: props) => {
 
   return (
     <div className="p-4 space-y-6">
-      <button
-        onClick={handleSend}
-        className="bg-blue-500 text-white px-5 py-2 rounded hover:bg-blue-600 transition"
-      >
-        Regresión lineal
-      </button>
+      {/* Botón + select */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <label className="flex flex-col text-sm text-gray-700">
+          Columna a analizar
+          <select
+            value={dependent}
+            onChange={(e) => setDependent(e.target.value)}
+            className="mt-1 border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            {data?.columns.map((col) => (
+              <option key={col} value={col}>
+                {col}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          onClick={handleSend}
+          className="bg-blue-500 text-white px-5 py-2 rounded hover:bg-blue-600 transition"
+        >
+          Ejecutar regresión lineal
+        </button>
+      </div>
 
       {view && result.ok && (
         <div className="space-y-6">

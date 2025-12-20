@@ -15,29 +15,29 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 bp = Blueprint('bp', __name__)
 
-def run_regression(data: list, columns: list, dependent: str, categorical: list = [], alpha: float = 0.05) -> dict:
+def run_regression(data: list, columns: list, dependent: str, dummies: list = [], alpha: float = 0.05) -> dict:
     try:
         df = pd.DataFrame(data, columns=columns)
 
         # 1. Reemplazar strings vacíos por NaN explícitos
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
 
-        # 2. Detectar columnas categóricas (antes de forzar a numérico)
+        # 2. Detectar columnas categóricas (Para convertir a dummies) (antes de forzar a numérico)
         # Validar que las columnas existen
-        categorical_cols = [col for col in categorical if col in df.columns]
-        if categorical_cols:
-            df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
-
-        # 3. Crear dummies SOLO para categóricas válidas
-        if categorical_cols:
-            df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+        dummies_cols = [col for col in dummies if col in df.columns]
+        # 3. Crear dummies SOLO para columnas categóricas válidas
+        if dummies_cols:
+            df = pd.get_dummies(df, columns=dummies_cols, drop_first=True)
 
         # 4. Convertir todo a numérico y eliminar nulos
         df = df.apply(pd.to_numeric, errors='coerce')
         df.dropna(inplace=True)
 
-        if dependent not in df.columns:
-            return {"ok": False, "error": f"La variable dependiente '{dependent}' no existe en las columnas."}
+        dependent_col = dependent
+        if dependent_col not in df.columns:
+            # Tomar la primera columna como dependiente
+            dependent_col = df.columns[0]
+            print(f"No se encontró '{dependent}', se usará '{dependent_col}' como variable dependiente.")
 
         df = df.apply(pd.to_numeric, errors='coerce').dropna()
 
@@ -46,8 +46,8 @@ def run_regression(data: list, columns: list, dependent: str, categorical: list 
         if len(df) < 5:
             return {"ok": False, "error": "Se requieren al menos 5 observaciones para una regresión confiable."}
 
-        y = df[dependent]
-        X = df.drop(columns=[dependent])
+        y = df[dependent_col]
+        X = df.drop(columns=[dependent_col])
         if X.shape[1] == 0:
             return {"ok": False, "error": "No hay variables independientes (predictoras) disponibles."}
         X_const = sm.add_constant(X)
@@ -150,68 +150,59 @@ def run_regression(data: list, columns: list, dependent: str, categorical: list 
         prompt = f"""
 A continuación, te presento todos los resultados relevantes de una regresión lineal múltiple. Quiero que los interpretes en el **mismo orden** en el que los presento, **sin asumir nada adicional**, y que escribas la respuesta con **títulos visibles para cada sección**, seguidos de una explicación clara, útil y técnica.
 
-Las instrucciones para cada sección son:
-
-- Muestra los resultados bajo un título claro.
-- Primero, explica brevemente para qué sirve esa sección o prueba.
-- Luego, interpreta los resultados específicos que te entrego.
-- No uses ## ni comentarios, usa títulos como si fuera un informe.
-- En la sección de coeficientes, **no expliques el valor del coeficiente**, solo dime **si la variable es significativa (p < 0.05)** y **arma el modelo final Y = ...** con solo las variables significativas.
-- Si detectas problemas, propón acciones para mejorar el modelo.
-
 ---
 
 ### Resultados de la Regresión Lineal Múltiple
 
 **Coeficientes**
 
-Variable\tCoeficiente\tValor p  
+Variable\tCoeficiente\tValor p
 {coefs_str}
 
 ---
 
 **Resumen del Modelo**
 
-Observaciones: {len(df)}  
-Variables independientes: {X.shape[1]}  
-R²: {round(r2, 4)}  
-R² ajustado: {round(r2_adj, 4)}  
-Estadístico F: {round(f_stat, 4)}  
-Valor p del modelo: {round(f_pvalue, 4)}  
+Observaciones: {len(df)}
+Variables independientes: {X.shape[1]}
+R²: {round(r2, 4)}
+R² ajustado: {round(r2_adj, 4)}
+Estadístico F: {round(f_stat, 4)}
+Valor p del modelo: {round(f_pvalue, 4)}
 Conclusión: {conclusion}
 
 ---
 
 **Pruebas de Supuestos**
 
-Shapiro-Wilk p: {round(sw_p, 4)}  
-Kolmogorov-Smirnov p: {round(ks_p, 4)}  
-Jarque-Bera p: {round(jb_p, 4)}  
-Skewness: {round(jb_skew, 4)}  
-Kurtosis: {round(jb_kurt, 4)}  
+Shapiro-Wilk p: {round(sw_p, 4)}
+Kolmogorov-Smirnov p: {round(ks_p, 4)}
+Jarque-Bera p: {round(jb_p, 4)}
+Skewness: {round(jb_skew, 4)}
+Kurtosis: {round(jb_kurt, 4)}
 Durbin-Watson: {round(dw, 4)}
 
 ---
 
 **Breusch-Pagan (Heterocedasticidad)**
 
-LM p: {round(bp_test[1], 4)}  
+LM p: {round(bp_test[1], 4)}
 F p: {round(bp_test[3], 4)}
 
 ---
 
 **White (Heterocedasticidad)**
 
-Estadístico: {white_result.get("stat", "N/A")}  
-p-valor: {white_result.get("p_value", "N/A")}  
-F-stat: {white_result.get("f_stat", "N/A")}  
+Estadístico: {white_result.get("stat", "N/A")}
+p-valor: {white_result.get("p_value", "N/A")}
+F-stat: {white_result.get("f_stat", "N/A")}
 F p-valor: {white_result.get("f_p_value", "N/A")}
 
 ---
 
 **VIF (Multicolinealidad)**
 
-Variable\tVIF  
+Variable\tVIF
 {vif_str}
 
 ---
@@ -219,17 +210,27 @@ Tabla de residuos
 {results_table}
 
 ---
+
+Las instrucciones para cada sección son:
+
+- Primero dame una interpretación de lo que estamos analizando, con ayuda del nombre de las columnas, puedes saber de qué tratan los datos.
+- Muestra los resultados bajo un título claro.
+- Primero, explica brevemente para qué sirve esa sección.
+- Luego, interpreta los resultados específicos que te entrego para cada sección.
+- Debes usar para la respuesta formato .md
+- Explica tanto el valor como el significado del valor de las variables significativas.
+- Con la interpretación de los resultados, propón acciones para mejorar el modelo.
 """
 
-        # Consulta a GPT
+        # ---- Consulta a la api de OPEN.IA ----
         gpt_response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Eres un experto en estadística."},
                 {"role": "user", "content": prompt.strip()}
             ],
             temperature=0.4,
-            max_tokens=1500
+            max_tokens=4096
         )
 
         return {

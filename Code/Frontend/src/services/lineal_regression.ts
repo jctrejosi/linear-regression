@@ -3,6 +3,7 @@ import axios from "axios";
 type DataSend = {
   columns: string[];
   data: (string | number | null)[][];
+  dependent: string;
 };
 
 export type RegressionResponse = {

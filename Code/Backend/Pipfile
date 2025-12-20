@@ -12,6 +12,7 @@ flask = "*"
 openai = "*"
 statsmodels = "*"
 dotenv = "*"
+xlrd = "*"
 
 [dev-packages]
 

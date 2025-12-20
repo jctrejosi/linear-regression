@@ -30,7 +30,7 @@ export const AnovaAnalysis = ({ data }: Props) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-lg">
+    <div className="mx-auto p-6 bg-white shadow-md rounded-lg">
       <button
         onClick={handleSend}
         className="mb-6 px-5 py-2 bg-blue-600 text-white font-semibold rounded hover:bg-blue-700 transition"
