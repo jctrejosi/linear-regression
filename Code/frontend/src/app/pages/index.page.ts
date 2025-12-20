@@ -1,27 +1,114 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { BaseChartDirective } from 'ng2-charts';
+import { ChartConfiguration } from 'chart.js';
+
+import { CoinService, Coin } from './index/services/coin.service';
+import {
+  CurrencyRateService,
+  CurrencyRateMap,
+} from './index/services/currency-rate.service';
 
 @Component({
-  selector: 'app-home',
-  template: `
-    <div class="p-4 bg-blue-100 text-blue-800">Tailwind funciona</div>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .read-the-docs > * {
-      color: red;
-    }
-
-    @media (prefers-color-scheme: light) {
-      .read-the-docs > * {
-        color: #213547;
-      }
-    }
-  `,
+  selector: 'app-index',
+  standalone: true,
+  imports: [CommonModule, BaseChartDirective],
+  templateUrl: './index/index.page.html',
 })
-export default class Home {}
+export default class IndexPage implements OnInit {
+  private coinService = inject(CoinService);
+  private rateService = inject(CurrencyRateService);
+
+  // estado reactivo
+  coins = signal<Coin[]>([]);
+  selectedCoinIds = signal<Set<number>>(new Set());
+
+  ratesMap = signal<CurrencyRateMap>({});
+
+  chartData = signal<ChartConfiguration<'line'>['data']>({
+    labels: [],
+    datasets: [],
+  });
+
+  chartOptions: ChartConfiguration<'line'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: 'day',
+        },
+      },
+      y: {
+        beginAtZero: false,
+      },
+    },
+  };
+
+  ngOnInit(): void {
+    this.loadCoins();
+  }
+
+  private loadCoins(): void {
+    this.coinService.getAllCoins().subscribe((coins) => {
+      this.coins.set(coins);
+    });
+  }
+
+  toggleCoin(coinId: number): void {
+    const next = new Set(this.selectedCoinIds());
+
+    if (next.has(coinId)) {
+      next.delete(coinId);
+    } else {
+      next.add(coinId);
+    }
+
+    this.selectedCoinIds.set(next);
+    this.fetchRates();
+  }
+
+  private fetchRates(): void {
+    const ids = Array.from(this.selectedCoinIds());
+
+    if (ids.length === 0) {
+      this.chartData.set({ labels: [], datasets: [] });
+      return;
+    }
+
+    this.rateService.getHistoryByCoinIds(ids).subscribe((map) => {
+      this.ratesMap.set(map);
+      this.buildChart();
+    });
+  }
+
+  private buildChart(): void {
+    const map = this.ratesMap();
+    const datasets: ChartConfiguration<'line'>['data']['datasets'] = [];
+    let labels: string[] = [];
+
+    Object.entries(map).forEach(([coinId, rates]) => {
+      if (!rates || rates.length === 0) return;
+
+      if (labels.length === 0) {
+        labels = rates.map((r) => r.rateDate);
+      }
+
+      datasets.push({
+        label: `coin ${coinId}`,
+        data: rates.map((r) => r.rateToUsd),
+        tension: 0.25,
+      });
+    });
+
+    this.chartData.set({
+      labels,
+      datasets,
+    });
+  }
+}

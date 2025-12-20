@@ -1,0 +1,39 @@
+<div class="grid grid-cols-4 h-screen">
+  <!-- sidebar -->
+  <aside class="col-span-1 border-r border-gray-300 p-4 overflow-y-auto">
+    <h3 class="text-lg font-semibold mb-4">coins</h3>
+
+    <ul class="space-y-2">
+      <li *ngFor="let coin of coins()">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            class="accent-blue-600"
+            (change)="toggleCoin(coin.id)"
+          />
+          <span>{{ coin.name }}</span>
+        </label>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- content -->
+  <main class="col-span-3 p-6">
+    <ng-container *ngIf="chartData().datasets.length; else empty">
+      <div class="w-full h-[80vh]">
+        <canvas
+          baseChart
+          [data]="chartData()"
+          [options]="chartOptions"
+          chartType="line">
+        </canvas>
+      </div>
+    </ng-container>
+
+    <ng-template #empty>
+      <p class="text-gray-500 italic">
+        selecciona una o más monedas para ver la gráfica
+      </p>
+    </ng-template>
+  </main>
+</div>
