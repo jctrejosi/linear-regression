@@ -91,10 +91,10 @@ export const LinealRegresion = ({ data }: props) => {
           <button
             onClick={handleSend}
             disabled={loading}
-            className={`px-5 py-2 rounded text-white font-semibold transition ${
+            className={`px-5 py-2 rounded text-white font-semibold transition w-[15rem] ${
               loading
-                ? "bg-blue-400 animate-pulse cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600"
+                ? "bg-blue-300 animate-pulse cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-600"
             }`}
           >
             {loading ? "Ejecutando..." : "Ejecutar regresión lineal"}

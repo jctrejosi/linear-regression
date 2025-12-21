@@ -42,7 +42,7 @@ export const AnovaAnalysis = ({ data }: Props) => {
         <button
           onClick={handleSend}
           disabled={loading}
-          className={`px-5 py-2 font-semibold rounded transition ${
+          className={`px-5 py-2 font-semibold rounded transition w-[15rem] ${
             loading
               ? "bg-blue-300 cursor-not-allowed animate-pulse"
               : "bg-blue-600 text-white hover:bg-blue-700"
@@ -57,7 +57,7 @@ export const AnovaAnalysis = ({ data }: Props) => {
             className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition text-gray-700 flex items-center gap-1"
             title="Ver último resultado"
           >
-            <FaEye />
+            <FaEye /> Resultado anterior
           </button>
         )}
       </div>
