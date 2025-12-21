@@ -1,5 +1,10 @@
 from flask import Blueprint
 from openai import OpenAI
+from pandas.api.types import (
+    is_numeric_dtype,
+    is_datetime64_any_dtype,
+    is_bool_dtype
+)
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -15,119 +20,235 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 bp = Blueprint('bp', __name__)
 
-def run_regression(data: list, columns: list, dependent: str, dummies: list = [], alpha: float = 0.05) -> dict:
+# Clasificación automática de columnas para saber cuáles no usar en la regresión
+def classify_columns(df, dependent=None, max_categories=15):
+    info = {
+        "numeric": [],
+        "categorical": [],
+        "datetime": [],
+        "boolean": [],
+        "constant": [],
+        "id_like": [],
+        "invalid": []
+    }
+
+    n_rows = len(df)
+
+    for col in df.columns:
+        if col == dependent:
+            continue
+
+        s = df[col]
+        nunique = s.nunique(dropna=True)
+
+        # 1) constante
+        if nunique <= 1:
+            info["constant"].append(col)
+            continue
+
+        # 2) booleanos
+        if is_bool_dtype(s) or set(s.dropna().unique()).issubset({0, 1, "0", "1", True, False}):
+            info["boolean"].append(col)
+            continue
+
+        # 3) numéricos (ANTES que datetime)
+        if is_numeric_dtype(s):
+            if nunique == n_rows and pd.api.types.is_integer_dtype(s):
+                info["id_like"].append(col)
+            else:
+                info["numeric"].append(col)
+            continue
+
+        # 4) datetime SOLO si es texto
+        if s.dtype == "object":
+            parsed = pd.to_datetime(s.dropna(), dayfirst=True, errors="coerce")
+
+            # además exigimos separadores típicos de fecha
+            has_date_tokens = s.dropna().astype(str).str.contains(r"[./\-:]").mean()
+
+            if (
+                len(parsed) > 0
+                and parsed.notna().mean() >= 0.8
+                and has_date_tokens >= 0.8
+            ):
+                info["datetime"].append(col)
+                continue
+
+        # 5) categóricos
+        if nunique <= max_categories:
+            info["categorical"].append(col)
+            continue
+
+        # 6) inválidos
+        info["invalid"].append(col)
+
+    return info
+
+def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.05) -> dict:
     try:
-        # ============================================================
-        # 1. Leer el dataframe
-        # ============================================================
+        # ---------------------------------------------------
+        # limpieza, validación automática de columnas y creación de df_valid
+        # ---------------------------------------------------
         df_raw = pd.DataFrame(data, columns=columns)
+        column_errors = {}         # detalles por columna (ejemplos/filas)
+        meta = {
+            "dropped_columns": [],   # columnas eliminadas automáticamente
+            "auto_dummies": [],      # categóricas convertidas a dummies
+            "warnings": [],          # avisos (e.g. dependent reasignado)
+            "rows_before": len(df_raw),
+            "rows_after": None,
+            "imputed_columns": {},   # columnas imputadas: {col: {"mean":..., "count":...}}
+        }
 
-        # guardar los errores por columna para reportarlos al front
-        column_errors = {}
+        # 1) clasificar columnas (usa tu función classify_columns)
+        info = classify_columns(df_raw, dependent)
 
-        # copia de los datos
-        df = df_raw.copy()
+        # 2) definir columnas a eliminar automáticamente:
+        # datetime, id_like, constant, invalid -> no aportan a la regresión lineal
+        drop_cols = info["datetime"] + info["id_like"] + info["constant"] + info["invalid"]
+        meta["dropped_columns"] = drop_cols.copy()
 
+        # 3) Si la columna (Variable) dependiente fue descartada, reasignar automáticamente
+        if dependent in drop_cols:
+            candidates = [c for c in df_raw.columns if c not in drop_cols]
+            if not candidates:
+                return {
+                    "ok": False,
+                    "error": f"La variable dependiente '{dependent}' fue descartada y no hay columnas alternativas."
+                }
+            new_dep = candidates[0]
+            meta["warnings"].append(
+                f"variable dependiente '{dependent}' fue descartada; se usará '{new_dep}' en su lugar."
+            )
+            dependent = new_dep
 
-        # ============================================================
-        # 2. conversión a numérico y detección de valores inválidos
-        # ============================================================
-        for col in df.columns:
+        # 4) crear df inicial con columnas filtradas
+        df = df_raw.drop(columns=drop_cols, errors="ignore").copy()
+
+        # 5) transformar categóricas a dummies y booleanos a 0/1 (si existen)
+        cats_to_dummy = [c for c in info["categorical"] if c in df.columns]
+        if cats_to_dummy:
+            df = pd.get_dummies(df, columns=cats_to_dummy, drop_first=True)
+            meta["auto_dummies"] = cats_to_dummy
+
+        for col in info["boolean"]:
+            if col in df.columns:
+                # seguridad: si booleano está como strings 'True'/'False' o 0/1, forzar a int
+                df[col] = df[col].map({True: 1, False: 0, "True": 1, "False": 0}).fillna(df[col])
+                try:
+                    df[col] = df[col].astype(int)
+                except Exception:
+                    # si falló conversión, dejar como está — se detectará más abajo
+                    pass
+
+        # 6) conversión forzada a numérico por columna y recopilación de filas problemáticas
+        for col in list(df.columns):
             original = df[col]
-
-            # conversión forzada a numérico
-            numeric = pd.to_numeric(original, errors="coerce")
-
-            # filas con valores no numéricos reales (NaN en la conversión pero no en el original)
-            bad_rows = original[numeric.isna() & original.notna()]
-
-            if not bad_rows.empty:
+            converted = pd.to_numeric(original, errors="coerce")
+            # filas problemáticas: conversion -> NaN, pero original no es NaN
+            bad_mask = converted.isna() & original.notna()
+            if bad_mask.any():
+                # guardar hasta 10 ejemplos + índices
+                bad_vals = original[bad_mask].astype(str).unique().tolist()[:10]
                 column_errors[col] = {
                     "type": "non_numeric_values",
-                    "rows": bad_rows.index.tolist(),
-                    "values": bad_rows.astype(str).unique().tolist()[:5]
+                    "rows": original[bad_mask].index.tolist(),
+                    "values": bad_vals
                 }
+            df[col] = converted
 
-            df[col] = numeric
+        # 7) descartar columnas con demasiados NaN parciales
+        nan_ratio = df.isna().mean()
+        PARTIAL_NAN_THRESHOLD = 0.20  # 20% de tolerancia para NaN parciales
+        cols_with_too_many_nan = nan_ratio[nan_ratio > PARTIAL_NAN_THRESHOLD].index.tolist()
+        if cols_with_too_many_nan:
+            meta["dropped_columns"].extend(cols_with_too_many_nan)
+            meta["warnings"].append(
+                f"Columnas eliminadas por exceso de valores no numéricos (> {PARTIAL_NAN_THRESHOLD*100}% NaN): {cols_with_too_many_nan}"
+            )
+            df = df.drop(columns=cols_with_too_many_nan, errors="ignore")
 
-        # ============================================================
-        # 3. columnas completamente inválidas (100% NaN)
-        # ============================================================
-        invalid_cols = [
-            col for col in df.columns
-            if df[col].isna().all()
-        ]
+        # 8) descartar columnas que quedaron totalmente NaN
+        invalid_cols_after = [c for c in df.columns if df[c].isna().all()]
+        if invalid_cols_after:
+            meta["dropped_columns"] += invalid_cols_after
+            df = df.drop(columns=invalid_cols_after, errors="ignore")
+            meta["warnings"].append(
+                f"Se descartaron columnas totalmente inválidas tras conversión: {', '.join(invalid_cols_after)}"
+            )
 
-        if invalid_cols:
-            return {
-                "ok": False,
-                "error": (
-                    "Hay columnas completamente no numéricas: "
-                    + ", ".join(invalid_cols)
-                ),
-                "invalid_columns": invalid_cols,
-                "details": column_errors
-            }
+        # 9) en los valores NaN colocar la media de la columna (imputación)
+        for col in df.columns:
+            if df[col].isna().any():
+                # calcular media sin NaN
+                mean_val = df[col].mean()
+                if np.isnan(mean_val):
+                    # si la media no se puede calcular (col vacía), se descartará más arriba
+                    continue
+                count_nan = int(df[col].isna().sum())
+                df[col].fillna(mean_val, inplace=True)
+                meta["imputed_columns"][col] = {"mean": float(mean_val), "count": count_nan}
 
-        # ============================================================
-        # 4. eliminación de filas con valores faltantes
-        # ============================================================
-        df.dropna(inplace=True)
+        # 10) validar que quedan filas y columnas suficientes
+        meta["rows_after"] = len(df)
 
+        MIN_OBS = 5
         if df.empty:
             return {
                 "ok": False,
-                "error": "Los datos quedaron vacíos después de limpiar valores inválidos."
+                "error": "No quedaron columnas utilizables después de la limpieza.",
+                "details": column_errors,
+                "meta": meta
             }
 
-        # ============================================================
-        # 5. columnas constantes (varianza cero)
-        # ============================================================
-        constant_cols = [
-            col for col in df.columns
-            if df[col].nunique() <= 1
-        ]
-
-        if constant_cols:
+        if len(df) < MIN_OBS:
             return {
                 "ok": False,
-                "error": (
-                    "Hay columnas constantes que invalidan la regresión: "
-                    + ", ".join(constant_cols)
-                ),
-                "constant_columns": constant_cols
+                "error": f"Se requieren al menos {MIN_OBS} observaciones después de la limpieza.",
+                "n_after_clean": len(df),
+                "meta": meta,
+                "details": column_errors
             }
 
-        # ============================================================
-        # 6. validación mínima de estructura
-        # ============================================================
+        # 11) detectar columnas constantes resultantes y descartarlas (registradas)
+        constant_cols_after = [c for c in df.columns if df[c].nunique() <= 1]
+        if constant_cols_after:
+            df = df.drop(columns=constant_cols_after, errors="ignore")
+            meta["dropped_columns"] += constant_cols_after
+            meta["warnings"].append(
+                f"Se quitaron columnas constantes tras limpieza: {', '.join(constant_cols_after)}"
+            )
+
+        # 12) tras descartes, validar número de columnas mínimo (dependiente + al menos 1 independiente)
         if df.shape[1] < 2:
             return {
                 "ok": False,
-                "error": "No hay suficientes variables para estimar el modelo."
+                "error": "No quedaron suficientes variables (columnas) para ajustar el modelo después de la limpieza.",
+                "meta": meta,
+                "details": column_errors
             }
 
-        if len(df) < 5:
+        # 13) determinar variable dependiente final
+        dependent_col = dependent if dependent in df.columns else df.columns[0]
+        if dependent_col not in df.columns:
             return {
                 "ok": False,
-                "error": "Se requieren al menos 5 observaciones para una regresión confiable."
+                "error": "No se pudo determinar una variable dependiente válida tras la limpieza.",
+                "meta": meta,
+                "details": column_errors
             }
 
-        # ============================================================
-        # 7. definición de variable dependiente
-        # ============================================================
-        dependent_col = dependent if dependent in df.columns else df.columns[0]
-
-        # ============================================================
-        # 8. separación de variables dependiente e independientes
-        # ============================================================
-        y = df[dependent_col]
-        X = df.drop(columns=[dependent_col])
+        # 14) construir y, X desde df_valid (ya limpio y con imputaciones)
+        df_valid = df.copy()
+        y = df_valid[dependent_col]
+        X = df_valid.drop(columns=[dependent_col])
 
         if X.shape[1] == 0:
             return {
                 "ok": False,
-                "error": "No hay variables independientes disponibles."
+                "error": "No quedaron variables independientes después de la limpieza.",
+                "meta": meta,
+                "details": column_errors
             }
 
         # ============================================================
@@ -135,7 +256,6 @@ def run_regression(data: list, columns: list, dependent: str, dummies: list = []
         # ============================================================
         X_const = sm.add_constant(X)
         model = sm.OLS(y, X_const).fit()
-
 
         # Métricas principales
         r2, r2_adj = model.rsquared, model.rsquared_adj
@@ -324,6 +444,7 @@ Las instrucciones para cada sección son:
 
         return {
             "ok": True,
+            "meta": meta,
             "n_obs": int(model.nobs),
             "n_vars": int(len(model.params) - 1),
             "r2": round(r2, 4),
@@ -332,6 +453,7 @@ Las instrucciones para cada sección son:
             "f_pvalue": round(f_pvalue, 4),
             "anova": anova,
             "coefs": coefs,
+            "dependent_variable": dependent_col,
             "normality": {
                 "shapiro_p": round(sw_p, 4),
                 "ks_p": round(ks_p, 4),
@@ -355,6 +477,7 @@ Las instrucciones para cada sección son:
         import traceback
         return {
             "ok": False,
+            "meta": meta,
             "error": str(e),
             "trace": traceback.format_exc()
         }

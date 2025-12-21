@@ -4,11 +4,24 @@ type DataSend = {
   columns: string[];
   data: (string | number | null)[][];
   dependent: string;
-  dummies: string[];
+};
+
+export type RegressionMeta = {
+  dropped_columns?: string[];
+  auto_dummies?: string[];
+  warnings?: string[];
+  rows_before?: number | null;
+  rows_after?: number | null;
+  imputed_columns?: Record<
+    string,
+    { mean: number; count: number } | { mean?: number; count?: number }
+  >;
 };
 
 export type RegressionResponse = {
   ok: boolean;
+  dependent_variable: string;
+  meta?: RegressionMeta;
   n_obs: number;
   n_vars: number;
   r2: number;

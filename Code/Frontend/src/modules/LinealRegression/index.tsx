@@ -3,12 +3,15 @@ import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { FaEye } from "react-icons/fa";
+import { FiFileText } from "react-icons/fi";
 
 import {
   set_regression,
+  type RegressionMeta,
   type RegressionResponse,
 } from "@/services/lineal_regression";
 import axios from "axios";
+import { MetaModal } from "./MetaModal";
 
 type props = {
   data: TableFile | undefined;
@@ -21,6 +24,8 @@ export const LinealRegresion = ({ data }: props) => {
   );
   const [dependent, setDependent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [meta, setMeta] = useState<RegressionMeta>({} as RegressionMeta);
+  const [showMetaModal, setShowMetaModal] = useState(false);
 
   // Inicializar dependent con la primera columna disponible
   useEffect(() => {
@@ -44,8 +49,11 @@ export const LinealRegresion = ({ data }: props) => {
         columns: data.columns,
         data: data.data,
         dependent,
-        dummies: [],
       });
+      if (response.meta) {
+        setMeta(response.meta ?? null);
+        setShowMetaModal(true);
+      }
       setResult(response);
       setView(true);
     } catch (error: unknown) {
@@ -53,7 +61,10 @@ export const LinealRegresion = ({ data }: props) => {
         const data = error.response?.data as {
           error?: string;
           details?: Record<string, unknown>;
+          meta: RegressionMeta;
         };
+        setMeta(data.meta);
+        setShowMetaModal(true);
 
         console.error("Error regresión:", data);
 
@@ -95,7 +106,7 @@ export const LinealRegresion = ({ data }: props) => {
               className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition text-gray-700 flex items-center gap-1"
               title="Ver último resultado"
             >
-              <FaEye />
+              <FaEye /> Resultado anterior
             </button>
           )}
         </div>
@@ -117,7 +128,14 @@ export const LinealRegresion = ({ data }: props) => {
 
       {/* Modal */}
       {view && result.ok && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+          {meta && (
+            <MetaModal
+              meta={meta}
+              open={showMetaModal}
+              onClose={() => setShowMetaModal(false)}
+            />
+          )}
           <div className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg shadow-lg p-6 pt-0">
             {/* Cerrar modal */}
             <div className="sticky top-0 z-10 flex justify-end mb-4">
@@ -129,9 +147,23 @@ export const LinealRegresion = ({ data }: props) => {
               </button>
             </div>
 
-            <h1 className="text-2xl font-semibold">
-              Resultados de la regresión lineal
-            </h1>
+            {/* Título y botón ver meta */}
+            <div className="flex items-center gap-4 mb-6">
+              <h1 className="text-2xl font-semibold">
+                Resultados de la regresión lineal
+              </h1>
+
+              <button
+                onClick={() => setShowMetaModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm
+                text-blue-700 bg-blue-50 border border-blue-200
+                rounded hover:bg-blue-100"
+                title="ver informe de limpieza de datos"
+              >
+                <FiFileText size={18} />
+                ver informe
+              </button>
+            </div>
 
             {/* Sección general */}
             <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
@@ -140,7 +172,8 @@ export const LinealRegresion = ({ data }: props) => {
                   <strong>Observaciones:</strong> {result.n_obs}
                 </p>
                 <p>
-                  <strong>Variables independientes:</strong> {result.n_vars}
+                  <strong>Variable independiente:</strong>{" "}
+                  {result.dependent_variable}
                 </p>
                 <p>
                   <strong>R²:</strong> {result.r2}
@@ -159,7 +192,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </p>
               </div>
             </div>
-
             {/* Coeficientes */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">Coeficientes</h2>
@@ -197,7 +229,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </tbody>
               </table>
             </div>
-
             {/* Pruebas de supuestos */}
             <div className="bg-gray-50 p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
@@ -225,7 +256,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </p>
               </div>
             </div>
-
             {/* Breusch-Pagan y White */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white p-4 rounded-lg shadow">
@@ -264,7 +294,6 @@ export const LinealRegresion = ({ data }: props) => {
                 )}
               </div>
             </div>
-
             {/* VIF */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
@@ -298,7 +327,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </tbody>
               </table>
             </div>
-
             {/* Interpretación */}
             <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">
@@ -310,7 +338,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </ReactMarkdown>
               </div>
             </div>
-
             {/* Tabla de residuos */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">
