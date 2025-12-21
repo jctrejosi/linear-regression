@@ -17,33 +17,45 @@ bp = Blueprint('bp', __name__)
 
 def run_regression(data: list, columns: list, dependent: str, dummies: list = [], alpha: float = 0.05) -> dict:
     try:
-        df = pd.DataFrame(data, columns=columns)
+        # ============================================================
+        # 1. Leer el dataframe
+        # ============================================================
+        df_raw = pd.DataFrame(data, columns=columns)
 
+        # guardar los errores por columna para reportarlos al front
         column_errors = {}
-        clean_df = df.copy()
 
+        # copia de los datos
+        df = df_raw.copy()
+
+
+        # ============================================================
+        # 2. conversión a numérico y detección de valores inválidos
+        # ============================================================
         for col in df.columns:
             original = df[col]
 
-            # intentar conversión numérica
-            numeric = pd.to_numeric(original, errors='coerce')
+            # conversión forzada a numérico
+            numeric = pd.to_numeric(original, errors="coerce")
 
-            # filas problemáticas
+            # filas con valores no numéricos reales (NaN en la conversión pero no en el original)
             bad_rows = original[numeric.isna() & original.notna()]
 
-            if len(bad_rows) > 0:
+            if not bad_rows.empty:
                 column_errors[col] = {
                     "type": "non_numeric_values",
                     "rows": bad_rows.index.tolist(),
                     "values": bad_rows.astype(str).unique().tolist()[:5]
                 }
 
-            clean_df[col] = numeric
+            df[col] = numeric
 
-        # columnas completamente inválidas
+        # ============================================================
+        # 3. columnas completamente inválidas (100% NaN)
+        # ============================================================
         invalid_cols = [
-            col for col in clean_df.columns
-            if clean_df[col].isna().all()
+            col for col in df.columns
+            if df[col].isna().all()
         ]
 
         if invalid_cols:
@@ -57,12 +69,23 @@ def run_regression(data: list, columns: list, dependent: str, dummies: list = []
                 "details": column_errors
             }
 
-        clean_df.dropna(inplace=True)
+        # ============================================================
+        # 4. eliminación de filas con valores faltantes
+        # ============================================================
+        df.dropna(inplace=True)
 
-        # columnas constantes
+        if df.empty:
+            return {
+                "ok": False,
+                "error": "Los datos quedaron vacíos después de limpiar valores inválidos."
+            }
+
+        # ============================================================
+        # 5. columnas constantes (varianza cero)
+        # ============================================================
         constant_cols = [
-            col for col in clean_df.columns
-            if clean_df[col].nunique() <= 1
+            col for col in df.columns
+            if df[col].nunique() <= 1
         ]
 
         if constant_cols:
@@ -75,47 +98,44 @@ def run_regression(data: list, columns: list, dependent: str, dummies: list = []
                 "constant_columns": constant_cols
             }
 
-        df = clean_df
-
+        # ============================================================
+        # 6. validación mínima de estructura
+        # ============================================================
         if df.shape[1] < 2:
             return {
                 "ok": False,
-                "error": "No hay suficientes variables para estimar el modelo"
+                "error": "No hay suficientes variables para estimar el modelo."
             }
 
-        # 1. Reemplazar strings vacíos por NaN explícitos
-        df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
-
-        # 2. Detectar columnas categóricas (Para convertir a dummies) (antes de forzar a numérico)
-        # Validar que las columnas existen
-        dummies_cols = [col for col in dummies if col in df.columns]
-        # 3. Crear dummies SOLO para columnas categóricas válidas
-        if dummies_cols:
-            df = pd.get_dummies(df, columns=dummies_cols, drop_first=True)
-
-        # 4. Convertir todo a numérico y eliminar nulos
-        df = df.apply(pd.to_numeric, errors='coerce')
-        df.dropna(inplace=True)
-
-        dependent_col = dependent
-        if dependent_col not in df.columns:
-            # Tomar la primera columna como dependiente si no viene en la request
-            dependent_col = df.columns[0]
-
-        df = df.apply(pd.to_numeric, errors='coerce').dropna()
-
-        if df.empty:
-            return {"ok": False, "error": "Los datos están vacíos después de limpiar valores no numéricos o nulos."}
         if len(df) < 5:
-            return {"ok": False, "error": "Se requieren al menos 5 observaciones para una regresión confiable."}
+            return {
+                "ok": False,
+                "error": "Se requieren al menos 5 observaciones para una regresión confiable."
+            }
 
+        # ============================================================
+        # 7. definición de variable dependiente
+        # ============================================================
+        dependent_col = dependent if dependent in df.columns else df.columns[0]
+
+        # ============================================================
+        # 8. separación de variables dependiente e independientes
+        # ============================================================
         y = df[dependent_col]
         X = df.drop(columns=[dependent_col])
-        if X.shape[1] == 0:
-            return {"ok": False, "error": "No hay variables independientes (predictoras) disponibles."}
-        X_const = sm.add_constant(X)
 
+        if X.shape[1] == 0:
+            return {
+                "ok": False,
+                "error": "No hay variables independientes disponibles."
+            }
+
+        # ============================================================
+        # 9. agregar constante y ajustar modelo
+        # ============================================================
+        X_const = sm.add_constant(X)
         model = sm.OLS(y, X_const).fit()
+
 
         # Métricas principales
         r2, r2_adj = model.rsquared, model.rsquared_adj
