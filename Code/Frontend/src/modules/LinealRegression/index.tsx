@@ -86,8 +86,8 @@ export const LinealRegresion = ({ data }: props) => {
   return (
     <div>
       {/* Botón + select */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="flex gap-2 items-center">
+      <div className="flex flex-col sm:flex-row items-start gap-4">
+        <div className="flex gap-2">
           <button
             onClick={handleSend}
             disabled={loading}
@@ -110,12 +110,11 @@ export const LinealRegresion = ({ data }: props) => {
             </button>
           )}
         </div>
-        <label className="flex flex-col text-sm text-gray-700">
-          Variable dependiente
+        <label className="flex flex-col text-sm text-gray-500 underline font-bold">
           <select
             value={dependent}
             onChange={(e) => setDependent(e.target.value)}
-            className="mt-1 border border-gray-300 rounded px-2 py-1 text-sm"
+            className="border border-gray-300 rounded px-2 py-2 text-sm"
           >
             {data?.columns.map((col) => (
               <option key={col} value={col}>
@@ -123,6 +122,7 @@ export const LinealRegresion = ({ data }: props) => {
               </option>
             ))}
           </select>
+          Variable dependiente
         </label>
       </div>
 

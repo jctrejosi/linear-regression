@@ -1,6 +1,8 @@
 import type { TableFile } from "@/@types";
 import { useRef } from "react";
 import { FiTrash2 } from "react-icons/fi";
+import { AiOutlineInsertRowRight } from "react-icons/ai";
+import { AiOutlineInsertRowBelow } from "react-icons/ai";
 
 interface EditableTableProps {
   columns: string[];
@@ -77,23 +79,23 @@ export const EditableTable = ({
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <button
           onClick={addRow}
-          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition font-semibold"
+          className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2 rounded hover:bg-gray-600 transition font-semibold"
         >
-          + Añadir fila
+          <AiOutlineInsertRowBelow /> Añadir fila
         </button>
 
-        <div className="flex items-center gap-2 mt-2 sm:mt-0">
+        <div className="flex items-center mt-2 sm:mt-0">
           <input
             type="text"
             placeholder="Nombre de la columna"
             ref={columnName}
-            className="border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="border border-gray-300 rounded-l px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <button
             onClick={addColumn}
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition font-semibold"
+            className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-r hover:bg-gray-600 transition font-semibold"
           >
-            + Añadir columna
+            <AiOutlineInsertRowRight /> Añadir columna
           </button>
         </div>
       </div>
