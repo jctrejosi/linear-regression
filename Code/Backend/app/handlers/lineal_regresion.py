@@ -19,6 +19,70 @@ def run_regression(data: list, columns: list, dependent: str, dummies: list = []
     try:
         df = pd.DataFrame(data, columns=columns)
 
+        column_errors = {}
+        clean_df = df.copy()
+
+        for col in df.columns:
+            original = df[col]
+
+            # intentar conversión numérica
+            numeric = pd.to_numeric(original, errors='coerce')
+
+            # filas problemáticas
+            bad_rows = original[numeric.isna() & original.notna()]
+
+            if len(bad_rows) > 0:
+                column_errors[col] = {
+                    "type": "non_numeric_values",
+                    "rows": bad_rows.index.tolist(),
+                    "values": bad_rows.astype(str).unique().tolist()[:5]
+                }
+
+            clean_df[col] = numeric
+
+        # columnas completamente inválidas
+        invalid_cols = [
+            col for col in clean_df.columns
+            if clean_df[col].isna().all()
+        ]
+
+        if invalid_cols:
+            return {
+                "ok": False,
+                "error": (
+                    "Hay columnas completamente no numéricas: "
+                    + ", ".join(invalid_cols)
+                ),
+                "invalid_columns": invalid_cols,
+                "details": column_errors
+            }
+
+        clean_df.dropna(inplace=True)
+
+        # columnas constantes
+        constant_cols = [
+            col for col in clean_df.columns
+            if clean_df[col].nunique() <= 1
+        ]
+
+        if constant_cols:
+            return {
+                "ok": False,
+                "error": (
+                    "Hay columnas constantes que invalidan la regresión: "
+                    + ", ".join(constant_cols)
+                ),
+                "constant_columns": constant_cols
+            }
+
+        df = clean_df
+
+        if df.shape[1] < 2:
+            return {
+                "ok": False,
+                "error": "No hay suficientes variables para estimar el modelo"
+            }
+
         # 1. Reemplazar strings vacíos por NaN explícitos
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
 
@@ -35,9 +99,8 @@ def run_regression(data: list, columns: list, dependent: str, dummies: list = []
 
         dependent_col = dependent
         if dependent_col not in df.columns:
-            # Tomar la primera columna como dependiente
+            # Tomar la primera columna como dependiente si no viene en la request
             dependent_col = df.columns[0]
-            print(f"No se encontró '{dependent}', se usará '{dependent_col}' como variable dependiente.")
 
         df = df.apply(pd.to_numeric, errors='coerce').dropna()
 
@@ -223,15 +286,21 @@ Las instrucciones para cada sección son:
 """
 
         # ---- Consulta a la api de OPEN.IA ----
-        gpt_response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Eres un experto en estadística."},
-                {"role": "user", "content": prompt.strip()}
-            ],
-            temperature=0.4,
-            max_tokens=1500
-        )
+        try:
+            gpt_response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en estadística."},
+                    {"role": "user", "content": prompt.strip()}
+                ],
+                temperature=0.4,
+                max_tokens=1500
+            )
+            gpt_text = gpt_response.choices[0].message.content
+
+        except Exception as e:
+            gpt_text = None
+            gpt_error = str(e)
 
         return {
             "ok": True,
@@ -258,7 +327,7 @@ Las instrucciones para cada sección son:
             "durbin_watson": round(dw, 4),
             "vif": vif,
             "conclusion": conclusion,
-            "interpretacion": gpt_response.choices[0].message.content,
+            "interpretacion": gpt_text,
             "results_table": results_table.round(4).to_dict(orient="records")
         }
 

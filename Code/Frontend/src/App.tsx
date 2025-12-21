@@ -20,23 +20,22 @@ export const App = () => {
   return (
     <div className="App bg-gray-100 min-h-screen p-6 flex flex-col gap-8">
       <div className="max-w-6xl w-full mx-auto flex flex-col gap-6">
-        {/* Carga de archivo */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <FileUpload
-            setData={(data) => {
-              setDataTable(data);
-            }}
-          />
-        </div>
+        {/* Contenedor principal: FileUpload y acciones */}
+        <div className="bg-white p-6 rounded-lg shadow flex gap-6">
+          {/* FileUpload a la izquierda */}
+          <div className="w-1/3">
+            <FileUpload
+              setData={(data) => {
+                setDataTable(data);
+              }}
+            />
+          </div>
 
-        {/* Análisis ANOVA */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <AnovaAnalysis data={dataEditable} />
-        </div>
-
-        {/* Regresión Lineal */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <LinealRegresion data={dataEditable} />
+          {/* Anova y regresión a la derecha */}
+          <div className="w-2/3 flex flex-col gap-4">
+            <AnovaAnalysis data={dataEditable} />
+            <LinealRegresion data={dataEditable} />
+          </div>
         </div>
 
         {/* Tabla editable */}

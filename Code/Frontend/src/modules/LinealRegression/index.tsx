@@ -2,12 +2,13 @@ import type { TableFile } from "@/@types";
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { FaEye } from "react-icons/fa"; // Ícono de ojo
+import { FaEye } from "react-icons/fa";
 
 import {
   set_regression,
   type RegressionResponse,
 } from "@/services/lineal_regression";
+import axios from "axios";
 
 type props = {
   data: TableFile | undefined;
@@ -43,49 +44,38 @@ export const LinealRegresion = ({ data }: props) => {
         columns: data.columns,
         data: data.data,
         dependent,
+        dummies: [],
       });
       setResult(response);
       setView(true);
-    } catch (error) {
-      console.error(
-        "Error al realizar el análisis de regresión lineal:",
-        error
-      );
-      alert("Ocurrió un error al realizar el análisis de regresión lineal.");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data as {
+          error?: string;
+          details?: Record<string, unknown>;
+        };
+
+        console.error("Error regresión:", data);
+
+        alert(data?.error ?? "Error en el servidor");
+      } else if (error instanceof Error) {
+        console.error(error.message);
+        alert(error.message);
+      } else {
+        console.error(error);
+        alert("Error desconocido");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const openModal = () => {
-    if (!result.ok) {
-      alert("No hay resultados previos. Ejecute la regresión primero.");
-      return;
-    }
-    setView(true);
-  };
-
   const closeModal = () => setView(false);
 
   return (
-    <div className="p-4">
+    <div>
       {/* Botón + select */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <label className="flex flex-col text-sm text-gray-700">
-          Columna a analizar
-          <select
-            value={dependent}
-            onChange={(e) => setDependent(e.target.value)}
-            className="mt-1 border border-gray-300 rounded px-2 py-1 text-sm"
-          >
-            {data?.columns.map((col) => (
-              <option key={col} value={col}>
-                {col}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <div className="flex gap-2 items-center">
           <button
             onClick={handleSend}
@@ -99,14 +89,30 @@ export const LinealRegresion = ({ data }: props) => {
             {loading ? "Ejecutando..." : "Ejecutar regresión lineal"}
           </button>
 
-          <button
-            onClick={openModal}
-            className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition text-gray-700 flex items-center gap-1"
-            title="Ver último resultado"
-          >
-            <FaEye />
-          </button>
+          {result.ok && (
+            <button
+              onClick={() => setView(true)}
+              className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition text-gray-700 flex items-center gap-1"
+              title="Ver último resultado"
+            >
+              <FaEye />
+            </button>
+          )}
         </div>
+        <label className="flex flex-col text-sm text-gray-700">
+          Variable dependiente
+          <select
+            value={dependent}
+            onChange={(e) => setDependent(e.target.value)}
+            className="mt-1 border border-gray-300 rounded px-2 py-1 text-sm"
+          >
+            {data?.columns.map((col) => (
+              <option key={col} value={col}>
+                {col}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* Modal */}

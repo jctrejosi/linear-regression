@@ -4,6 +4,7 @@ type DataSend = {
   columns: string[];
   data: (string | number | null)[][];
   dependent: string;
+  dummies: string[];
 };
 
 export type RegressionResponse = {
@@ -68,7 +69,7 @@ export const set_regression = async (data: DataSend) => {
   try {
     const res = await axios.post<RegressionResponse>(
       "http://localhost:5000/api/v1.0/regression",
-      { ...data, dependent: "Y", categorical: ["X6"] }
+      { ...data }
     );
     return res.data;
   } catch (err) {
