@@ -6,6 +6,26 @@ type DataSend = {
   dependent: string;
 };
 
+export type AnovaResult = {
+  ok: boolean;
+  f_statistics: number;
+  p_value: number;
+  conclusion: string;
+  error?: string;
+  means: number[];
+  global_mean: number;
+  n_data: number;
+  k_groups: number;
+  ssb: number[];
+  sse: number[];
+  sse_string: string[];
+  ssb_string: string[];
+  ssb_total: number;
+  sse_total: number;
+  mse: number;
+  msb: number;
+};
+
 export type RegressionMeta = {
   dropped_columns?: string[];
   auto_dummies?: string[];
@@ -28,6 +48,7 @@ export type RegressionResponse = {
   r2_adj: number;
   f_statistic: number;
   f_pvalue: number;
+  anova: AnovaResult;
   coefs: {
     variable: string;
     coef: number;

@@ -1,8 +1,8 @@
 from flask import Blueprint
+from scipy.stats import f
 from openai import OpenAI
 from pandas.api.types import (
     is_numeric_dtype,
-    is_datetime64_any_dtype,
     is_bool_dtype
 )
 import pandas as pd
@@ -20,16 +20,26 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 bp = Blueprint('bp', __name__)
 
+def is_serial_by_sort(s, tol=0.99):
+    s = s.dropna()
+    if not pd.api.types.is_numeric_dtype(s):
+        return False
+    diffs = s.sort_values().diff().dropna()
+    # fracción de diferencias iguales
+    most_common_ratio = diffs.value_counts(normalize=True).max()
+    return most_common_ratio >= tol
+
 # Clasificación automática de columnas para saber cuáles no usar en la regresión
 def classify_columns(df, dependent=None, max_categories=15):
     info = {
-        "numeric": [],
+        "other": [],
         "categorical": [],
         "datetime": [],
         "boolean": [],
         "constant": [],
         "id_like": [],
-        "invalid": []
+        "invalid": [],
+        "serial": [],
     }
 
     n_rows = len(df)
@@ -51,13 +61,13 @@ def classify_columns(df, dependent=None, max_categories=15):
             info["boolean"].append(col)
             continue
 
-        # 3) numéricos (ANTES que datetime)
+        # 3) Comprobar si es una serie
         if is_numeric_dtype(s):
             if nunique == n_rows and pd.api.types.is_integer_dtype(s):
-                info["id_like"].append(col)
-            else:
-                info["numeric"].append(col)
-            continue
+                if is_serial_by_sort(s):
+                    info["serial"] = info.get("serial", []) + [col]
+                else:
+                    info["id_like"].append(col)
 
         # 4) datetime SOLO si es texto
         if s.dtype == "object":
@@ -79,15 +89,95 @@ def classify_columns(df, dependent=None, max_categories=15):
             info["categorical"].append(col)
             continue
 
-        # 6) inválidos
-        info["invalid"].append(col)
+        # 6) otros
+
+        info["other"].append(col)
 
     return info
+
+def run_anova(data):
+    # Transponer filas en columnas
+    columnas = list(zip(*data))
+
+    datos_limpios = []
+    medias = []
+    total_valores = 0
+
+    for columna in columnas:
+        limpios = []
+
+        for valor in columna:
+            if valor is None:
+                continue
+
+            try:
+                num = float(valor)
+                limpios.append(num)
+            except (ValueError, TypeError):
+                continue
+
+        if limpios:
+            datos_limpios.append(limpios)
+            total_valores += len(limpios)
+            media = sum(limpios) / len(limpios)
+            medias.append(media)
+
+    media_global = np.mean([m for m in medias if m is not None])
+
+    # Cálculo de SSB y SSE por grupo
+    ssb_strings = []
+    sse_strings = []
+    ssb = []
+    sse = []
+
+    for i, grupo in enumerate(datos_limpios):
+        ni = len(grupo)
+        media_i = medias[i]
+
+        # === SSB ===
+        ssb_val = ni * (media_i - media_global) ** 2
+        ssb.append(ssb_val)
+        ssb_str = f"{ni} × ({media_i} - {round(media_global, 3)})² = {round(ssb_val, 2)}"
+        ssb_strings.append(ssb_str)
+
+        # === SSE ===
+        sse_val = 0
+        sse_terms = []
+
+        for x in grupo:
+            term = (x - media_i) ** 2
+            sse_val += term
+            sse_terms.append(f"({x} - {media_i})²")
+
+        sse_str = f" + ".join(sse_terms) + f" = {round(sse_val, 2)}"
+        sse.append(round(sse_val, 2))
+        sse_strings.append(sse_str)
+
+        sum_ssb = sum(ssb)
+        sum_sse = sum(sse)
+
+        msb = sum_ssb/(len(columnas) - 1)
+        mse = sum_sse/(total_valores - len(columnas))
+
+    return {
+        "n_data": total_valores,
+        "grupos": datos_limpios,
+        "medias": medias,
+        "media_global": media_global,
+        "ssb_string": ssb_strings,
+        "sse_string": sse_strings,
+        "sse_total": sum_sse,
+        "ssb_total": sum_ssb,
+        "ssb": ssb,
+        "sse": sse,
+        "msb": msb,
+        "mse": mse
+    }
 
 def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.05) -> dict:
     try:
         # ---------------------------------------------------
-        # limpieza, validación automática de columnas y creación de df_valid
+        # limpieza, validación automática de columnas
         # ---------------------------------------------------
         df_raw = pd.DataFrame(data, columns=columns)
         column_errors = {}         # detalles por columna (ejemplos/filas)
@@ -100,66 +190,27 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             "imputed_columns": {},   # columnas imputadas: {col: {"mean":..., "count":...}}
         }
 
-        # 1) clasificar columnas (usa tu función classify_columns)
+        # 1) Clasificar columnas y eliminar las innecesarias
         info = classify_columns(df_raw, dependent)
-
-        # 2) definir columnas a eliminar automáticamente:
-        # datetime, id_like, constant, invalid -> no aportan a la regresión lineal
-        drop_cols = info["datetime"] + info["id_like"] + info["constant"] + info["invalid"]
+        drop_cols = info["datetime"] + info["id_like"] + info["constant"] + info["serial"] + ['id']
         meta["dropped_columns"] = drop_cols.copy()
-
-        # 3) Si la columna (Variable) dependiente fue descartada, reasignar automáticamente
-        if dependent in drop_cols:
-            candidates = [c for c in df_raw.columns if c not in drop_cols]
-            if not candidates:
-                return {
-                    "ok": False,
-                    "error": f"La variable dependiente '{dependent}' fue descartada y no hay columnas alternativas."
-                }
-            new_dep = candidates[0]
-            meta["warnings"].append(
-                f"variable dependiente '{dependent}' fue descartada; se usará '{new_dep}' en su lugar."
-            )
-            dependent = new_dep
-
-        # 4) crear df inicial con columnas filtradas
+        meta["warnings"].append(
+            f"Columnas eliminadas por tipo: {', '.join(drop_cols)}"
+        )
         df = df_raw.drop(columns=drop_cols, errors="ignore").copy()
 
-        # 5) transformar categóricas a dummies y booleanos a 0/1 (si existen)
-        cats_to_dummy = [c for c in info["categorical"] if c in df.columns]
-        if cats_to_dummy:
-            df = pd.get_dummies(df, columns=cats_to_dummy, drop_first=True)
-            meta["auto_dummies"] = cats_to_dummy
-
-        for col in info["boolean"]:
-            if col in df.columns:
-                # seguridad: si booleano está como strings 'True'/'False' o 0/1, forzar a int
-                df[col] = df[col].map({True: 1, False: 0, "True": 1, "False": 0}).fillna(df[col])
-                try:
-                    df[col] = df[col].astype(int)
-                except Exception:
-                    # si falló conversión, dejar como está — se detectará más abajo
-                    pass
-
-        # 6) conversión forzada a numérico por columna y recopilación de filas problemáticas
-        for col in list(df.columns):
-            original = df[col]
-            converted = pd.to_numeric(original, errors="coerce")
-            # filas problemáticas: conversion -> NaN, pero original no es NaN
-            bad_mask = converted.isna() & original.notna()
-            if bad_mask.any():
-                # guardar hasta 10 ejemplos + índices
-                bad_vals = original[bad_mask].astype(str).unique().tolist()[:10]
-                column_errors[col] = {
-                    "type": "non_numeric_values",
-                    "rows": original[bad_mask].index.tolist(),
-                    "values": bad_vals
-                }
-            df[col] = converted
+        # 11) detectar columnas constantes resultantes y descartarlas
+        constant_cols_after = [c for c in df.columns if df[c].nunique() <= 1]
+        if constant_cols_after:
+            df = df.drop(columns=constant_cols_after, errors="ignore")
+            meta["dropped_columns"] += constant_cols_after
+            meta["warnings"].append(
+                f"Se quitaron columnas constantes tras limpieza: {', '.join(constant_cols_after)}"
+            )
 
         # 7) descartar columnas con demasiados NaN parciales
         nan_ratio = df.isna().mean()
-        PARTIAL_NAN_THRESHOLD = 0.20  # 20% de tolerancia para NaN parciales
+        PARTIAL_NAN_THRESHOLD = 0.10  # 10% de tolerancia para NaN parciales
         cols_with_too_many_nan = nan_ratio[nan_ratio > PARTIAL_NAN_THRESHOLD].index.tolist()
         if cols_with_too_many_nan:
             meta["dropped_columns"].extend(cols_with_too_many_nan)
@@ -168,19 +219,33 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             )
             df = df.drop(columns=cols_with_too_many_nan, errors="ignore")
 
-        # 8) descartar columnas que quedaron totalmente NaN
-        invalid_cols_after = [c for c in df.columns if df[c].isna().all()]
-        if invalid_cols_after:
-            meta["dropped_columns"] += invalid_cols_after
-            df = df.drop(columns=invalid_cols_after, errors="ignore")
-            meta["warnings"].append(
-                f"Se descartaron columnas totalmente inválidas tras conversión: {', '.join(invalid_cols_after)}"
-            )
+        # 5) transformar categóricas a dummies y booleanos a 0/1 (si existen)
+        cats_to_dummy = [c for c in info["categorical"] if c in df.columns]
+        bool_cols = [c for c in info["boolean"] if c in df.columns]
 
-        # 9) en los valores NaN colocar la media de la columna (imputación)
+        for col in cats_to_dummy:
+            df[col] = df[col].fillna("missing")  # asigna missing a NaN antes de dummies
+
+        if cats_to_dummy:
+            df = pd.get_dummies(df, columns=cats_to_dummy, drop_first=True)  # aplicar dummies a categóricas
+
+        for col in bool_cols:
+            df[col] = df[col].map({True: 1, False: 0, "True": 1, "False": 0}) # Convertir booleanos a 0/1
+            df[col] = df[col].fillna(0).astype(int)
+
+        # Asegurarse de que los datos sean números luego de transformar dummies
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df = df.astype(float)
+
+        meta["auto_dummies"] = cats_to_dummy.copy()
+
+        # 8) en los valores NaN colocar la media de la columna (imputación)
         for col in df.columns:
             if df[col].isna().any():
                 # calcular media sin NaN
+                df[col] = df[col].astype(float) # asegurar float para la media
                 mean_val = df[col].mean()
                 if np.isnan(mean_val):
                     # si la media no se puede calcular (col vacía), se descartará más arriba
@@ -193,7 +258,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         meta["rows_after"] = len(df)
 
         MIN_OBS = 5
-        if df.empty:
+        if df.columns.size < 2:
             return {
                 "ok": False,
                 "error": "No quedaron columnas utilizables después de la limpieza.",
@@ -206,24 +271,6 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 "ok": False,
                 "error": f"Se requieren al menos {MIN_OBS} observaciones después de la limpieza.",
                 "n_after_clean": len(df),
-                "meta": meta,
-                "details": column_errors
-            }
-
-        # 11) detectar columnas constantes resultantes y descartarlas (registradas)
-        constant_cols_after = [c for c in df.columns if df[c].nunique() <= 1]
-        if constant_cols_after:
-            df = df.drop(columns=constant_cols_after, errors="ignore")
-            meta["dropped_columns"] += constant_cols_after
-            meta["warnings"].append(
-                f"Se quitaron columnas constantes tras limpieza: {', '.join(constant_cols_after)}"
-            )
-
-        # 12) tras descartes, validar número de columnas mínimo (dependiente + al menos 1 independiente)
-        if df.shape[1] < 2:
-            return {
-                "ok": False,
-                "error": "No quedaron suficientes variables (columnas) para ajustar el modelo después de la limpieza.",
                 "meta": meta,
                 "details": column_errors
             }
@@ -260,6 +307,29 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         # Métricas principales
         r2, r2_adj = model.rsquared, model.rsquared_adj
         f_stat, f_pvalue = model.fvalue, model.f_pvalue
+
+        # Tabla ANOVA
+        resultados_anova = run_anova(data)
+
+        grupos = resultados_anova["grupos"]
+
+        # Verificación: asegurarse de que cada grupo tiene al menos 2 datos
+        if any(len(grupo) < 2 for grupo in grupos):
+            return {"error": "Cada grupo debe tener al menos dos valores."}
+
+        # Aplicar ANOVA
+        k_groups = len(columns)
+        f_statistic = resultados_anova["msb"]/resultados_anova["mse"]
+        df_between = k_groups - 1
+        df_within = resultados_anova["n_data"] - k_groups
+        p_value = 1 - f.cdf(f_statistic, df_between, df_within)
+
+        # Conclusión
+        conclusion_anova = (
+            "Se rechaza la hipótesis nula: hay diferencias significativas entre los grupos."
+            if p_value < alpha else
+            "No se rechaza la hipótesis nula: no hay diferencias significativas entre los grupos."
+        )
 
         # Tabla ANOVA
         try:
@@ -470,7 +540,25 @@ Las instrucciones para cada sección son:
             "vif": vif,
             "conclusion": conclusion,
             "interpretacion": gpt_text,
-            "results_table": results_table.round(4).to_dict(orient="records")
+            "results_table": results_table.round(4).to_dict(orient="records"),
+            "anova": {
+                "ok": True,
+                "n_data": resultados_anova["n_data"],
+                "k_groups": k_groups,
+                "f_statistics": round(f_statistic, 2),
+                "means": [round(x, 2) for x in resultados_anova["medias"]],
+                "global_mean": round(resultados_anova["media_global"], 2),
+                "p_value": round(p_value, 2),
+                "conclusion": conclusion_anova,
+                "sse":  [round(x, 2) for x in resultados_anova["sse"]],
+                "ssb": [round(x, 2) for x in resultados_anova["ssb"]],
+                "sse_string": resultados_anova["sse_string"],
+                "ssb_string": resultados_anova["ssb_string"],
+                "ssb_total": round(resultados_anova["ssb_total"], 2),
+                "sse_total": round(resultados_anova["sse_total"],2),
+                "mse": round(resultados_anova["mse"], 2),
+                "msb": round(resultados_anova["msb"], 2)
+            }
         }
 
     except Exception as e:
