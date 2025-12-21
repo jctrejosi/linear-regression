@@ -45,3 +45,9 @@ def lineal_regression():
     result = run_regression(payload['data'], payload['columns'], payload['dependent'])
     return jsonify(result), 200 if result.get("ok") else 400
 
+@bp.route('/health', methods=['GET'])
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "regresion-backend"
+    }), 200

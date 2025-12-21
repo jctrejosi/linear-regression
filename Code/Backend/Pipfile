@@ -13,6 +13,7 @@ openai = "*"
 statsmodels = "*"
 dotenv = "*"
 xlrd = "*"
+gunicorn = "*"
 
 [dev-packages]
 
