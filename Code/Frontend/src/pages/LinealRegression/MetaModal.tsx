@@ -1,4 +1,4 @@
-import type { RegressionMeta } from "@/services/lineal_regression";
+import type { RegressionMeta } from "./services/lineal_regression";
 import { FaRegCopy, FaTimes } from "react-icons/fa";
 
 type Props = {

@@ -9,7 +9,7 @@ import {
   set_regression,
   type RegressionMeta,
   type RegressionResponse,
-} from "@/services/lineal_regression";
+} from "./services/lineal_regression";
 import axios from "axios";
 import { MetaModal } from "./MetaModal";
 import { AnovaResultsTable } from "./AnovaResultsTable";
@@ -55,7 +55,6 @@ export const LinealRegresion = ({ data }: props) => {
         setMeta(response.meta ?? null);
         setShowMetaModal(true);
       }
-      console.log(typeof response);
       setResult(response);
       setView(true);
     } catch (error: unknown) {
@@ -128,7 +127,10 @@ export const LinealRegresion = ({ data }: props) => {
 
       {/* Modal */}
       {view && result.ok && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+        <div
+          id="results-modal"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+        >
           {meta && (
             <MetaModal
               meta={meta}
@@ -136,7 +138,10 @@ export const LinealRegresion = ({ data }: props) => {
               onClose={() => setShowMetaModal(false)}
             />
           )}
-          <div className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg shadow-lg p-6 pt-0">
+          <div
+            id="result-text"
+            className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg shadow-lg p-6 pt-0"
+          >
             {/* Botón de cerrar modal */}
             <div className="sticky top-0 z-10 flex justify-end mb-4">
               <button
@@ -153,16 +158,30 @@ export const LinealRegresion = ({ data }: props) => {
                 Resultados de la regresión lineal
               </h1>
 
+              {/* Botón para ver el filtrado de los datos */}
               <button
                 onClick={() => setShowMetaModal(true)}
                 className="flex items-center gap-2 px-3 py-2 text-sm
-                text-blue-700 bg-blue-50 border border-blue-200
-                rounded hover:bg-blue-100"
+                text-yellow-700 bg-yellow-50 border border-yellow-200
+                rounded hover:bg-yellow-100"
                 title="ver informe de limpieza de datos"
               >
                 <FiFileText size={18} />
                 ver filtrado de datos
               </button>
+
+              {/* Botón para descargar un pdf de los datos 
+              <button
+                onClick={printModal}
+                className="flex items-center gap-2 px-3 py-2 text-sm
+                text-blue-700 bg-blue-50 border border-blue-200
+                rounded hover:bg-blue-100"
+                title="ver informe de limpieza de datos"
+              >
+                <HiDocumentDownload size={18} />
+                Descargar / Imprimir PDF
+              </button>
+              */}
             </div>
 
             {/* Sección de resultados generales */}

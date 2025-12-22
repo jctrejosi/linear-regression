@@ -1,8 +1,8 @@
-import { EditableTable } from "@components/EditableTable";
-import { FileUpload } from "@components/FileUpload";
+import { EditableTable } from "@/pages/LinealRegression/components/EditableTable";
+import { FileUpload } from "@/pages/LinealRegression/components/FileUpload";
 import { useEffect, useState } from "react";
 import type { TableFile } from "./@types";
-import { LinealRegresion } from "./modules/LinealRegression";
+import { LinealRegresion } from "./pages/LinealRegression";
 import { AiOutlinePaperClip } from "react-icons/ai";
 import axios from "axios";
 
