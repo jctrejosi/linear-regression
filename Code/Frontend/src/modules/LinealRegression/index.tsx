@@ -193,6 +193,18 @@ export const LinealRegresion = ({ data }: props) => {
               </div>
             </div>
 
+            {/* IA - Interpretación de resultados generales */}
+            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
+              <h2 className="text-lg font-semibold mb-2">
+                Interpretación de resultados generales
+              </h2>
+              <div className="prose max-w-full">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {result.ia_response_general_section}
+                </ReactMarkdown>
+              </div>
+            </div>
+
             {/* ANOVA */}
             {view && result.anova.ok && (
               <div className="relative w-full">
@@ -262,6 +274,18 @@ export const LinealRegresion = ({ data }: props) => {
               </div>
             )}
 
+            {/* IA - Interpretación del análisis anova */}
+            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
+              <h2 className="text-lg font-semibold mb-2">
+                Interpretación del análisis ANOVA
+              </h2>
+              <div className="prose max-w-full">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {result.ia_response_anova_analisis}
+                </ReactMarkdown>
+              </div>
+            </div>
+
             {/* Coeficientes */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">Coeficientes</h2>
@@ -300,7 +324,19 @@ export const LinealRegresion = ({ data }: props) => {
               </table>
             </div>
 
-            {/* Pruebas de supuestos */}
+            {/* IA - Interpretación de coeficientes */}
+            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
+              <h2 className="text-lg font-semibold mb-2">
+                Interpretación de los coeficientes
+              </h2>
+              <div className="prose max-w-full">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {result.ia_response_coefs}
+                </ReactMarkdown>
+              </div>
+            </div>
+
+            {/* Pruebas de supuestos (normality) */}
             <div className="bg-gray-50 p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
                 Pruebas de Supuestos
@@ -325,6 +361,18 @@ export const LinealRegresion = ({ data }: props) => {
                 <p>
                   <strong>Durbin-Watson:</strong> {result.durbin_watson}
                 </p>
+              </div>
+            </div>
+
+            {/* IA - Interpretación de pruebas de supuestos (normality) */}
+            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
+              <h2 className="text-lg font-semibold mb-2">
+                Interpretación de prueba de supuestos
+              </h2>
+              <div className="prose max-w-full">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {result.ia_response_normality}
+                </ReactMarkdown>
               </div>
             </div>
 
@@ -367,6 +415,18 @@ export const LinealRegresion = ({ data }: props) => {
               </div>
             </div>
 
+            {/* IA - Interpretación de breuch-pegan y while*/}
+            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
+              <h2 className="text-lg font-semibold mb-2">
+                Interpretación de Breusch-Pegan y prueba de White
+              </h2>
+              <div className="prose max-w-full">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {result.ia_response_breuch_and_white}
+                </ReactMarkdown>
+              </div>
+            </div>
+
             {/* VIF */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
@@ -401,14 +461,14 @@ export const LinealRegresion = ({ data }: props) => {
               </table>
             </div>
 
-            {/* Interpretación */}
+            {/* IA - Interpretación de VIF*/}
             <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">
-                Interpretación del Modelo
+                Interpretación de VIF
               </h2>
               <div className="prose max-w-full">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.interpretacion}
+                  {result.ia_response_vif}
                 </ReactMarkdown>
               </div>
             </div>

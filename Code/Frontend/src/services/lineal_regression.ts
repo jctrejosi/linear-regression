@@ -86,7 +86,6 @@ export type RegressionResponse = {
   }[];
   cooks_distance: number[];
   conclusion: string;
-  interpretacion: string;
   results_table: {
     id: number;
     Y_observado: number;
@@ -97,6 +96,12 @@ export type RegressionResponse = {
     Cooks_distance: number;
     Outlier: boolean;
   }[];
+  ia_response_general_section: string;
+  ia_response_anova_analisis: string;
+  ia_response_coefs: string;
+  ia_response_normality: string;
+  ia_response_breuch_and_white: string;
+  ia_response_vif: string;
 };
 
 export const set_regression = async (data: DataSend) => {

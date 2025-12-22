@@ -18,6 +18,12 @@ from scipy.stats import shapiro, kstest
 load_dotenv()
 bp = Blueprint('bp', __name__)
 
+# Consultar a una IA
+model_path = os.getenv("MODEL_PATH")
+
+# cargar modelo sin intentar descargar
+model_ia = GPT4All(model_path, allow_download=False)
+
 def is_serial_by_sort(s, tol=0.99):
     s = s.dropna()
     if not pd.api.types.is_numeric_dtype(s):
@@ -417,55 +423,137 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             for v in vif
         ])
 
-        # Prompt para la IA
-        prompt = f"""
-Eres un experto en estadística. Analiza los coeficientes de la regresión que te paso y da una interpretación clara:
+        # Prompts para la IA
+        prompt_general_section = f"""
+Eres un asistente experto en estadística y análisis de regresión lineal. Te voy a proporcionar los resultados generales de un modelo de regresión lineal. Quiero que me expliques de manera clara y didáctica cada uno de estos resultados:
 
-Variable	Coeiciente	Valor p
-{coefs_str}
+- Número de observaciones: {int(model.nobs)}
+- Variable dependiente: {dependent_col}
+- R²: {r2}
+- R² ajustado: {r2_adj}
+- Estadístico F: {f_statistic}
+- Valor p del modelo: {f_pvalue}
 
-Para cada variable, indica:
-1. Si es estadísticamente significativa.
-2. El efecto que tiene sobre la variable dependiente.
-3. Sugerencias para mejorar el modelo si alguna variable no es significativa.
+Por favor:
+1. Explica qué significa cada métrica.
+2. Indica si los valores sugieren que el modelo es bueno o no.
+3. Señala cualquier advertencia o consideración sobre la interpretación.
+4. Ofrece un resumen final comprensible para alguien con conocimientos básicos de estadística.
 
+Devuelve la explicación en un lenguaje claro y estructurado, evitando fórmulas complicadas y ejemplos innecesarios.
 """
 
-        # Consultar a una IA
-        model_path = "C:/Users/jctre/AppData/Local/nomic.ai/GPT4All/Llama-3.2-1B-Instruct-Q4_0.gguf"
-        # cargar modelo sin intentar descargar
-        model_ia = GPT4All(model_path, allow_download=False)
-        ia_response = model_ia.generate(prompt)
+        ia_response_general_section = model_ia.generate(prompt_general_section)
+
+        prompt_anova_analisis = f"""
+Eres un asistente experto en estadística y análisis de datos. Te voy a dar los resultados de un análisis ANOVA (one-way) y necesito que me expliques de manera clara y detallada qué significa cada resultado:
+
+- Número de grupos (k): {k_groups}
+- Número total de datos (N): {resultados_anova["n_data"]}
+- Estadístico F: {round(f_statistic, 2)}
+- Valor p: {p_value}
+- Medias de cada grupo: {[round(x, 2) for x in resultados_anova["medias"]]}
+- Media global: {round(resultados_anova["media_global"], 2)}
+- Conclusión del test: {conclusion}
+
+Por favor:
+1. Explica qué indica el estadístico F y cómo se interpreta.
+2. Explica el significado del valor p y qué nos dice sobre las diferencias entre grupos.
+3. Comenta si las medias de los grupos muestran diferencias significativas.
+4. Ofrece una conclusión clara y práctica sobre lo que implica este análisis para los datos.
+5. Utiliza un lenguaje comprensible para alguien con conocimientos básicos de estadística, evitando fórmulas complejas.
+
+Genera la explicación de forma estructurada y didáctica.
+"""
+        ia_response_anova_analisis = model_ia.generate(prompt_anova_analisis)
+
+        prompt_coefs = f"""
+Eres un asistente experto en análisis de regresión lineal. Te voy a dar los coeficientes de un modelo y necesito que me expliques qué significa cada uno:
+
+- Variable dependiente: {dependent_col}
+- Lista de coeficientes: {coefs_str}
+(cada elemento incluye: nombre de la variable, valor del coeficiente y valor p)
+
+Por favor:
+1. Explica cómo interpretar cada coeficiente en relación con la variable dependiente.
+2. Indica qué nos dice el valor p sobre la significancia de cada coeficiente.
+3. Comenta cuáles variables son estadísticamente significativas y cuáles no.
+4. Describe si los coeficientes positivos o negativos tienen sentido en el contexto de los datos.
+5. Genera la explicación de forma clara, estructurada y comprensible para alguien con conocimientos básicos de estadística.
+
+Incluye ejemplos concretos si es posible y ofrece conclusiones prácticas sobre el modelo.
+"""
+        ia_response_coefs = model_ia.generate(prompt_coefs)
+
+        prompt_normality = f"""
+Eres un asistente experto en regresión lineal. Te voy a dar los resultados de las pruebas de supuestos del modelo, y necesito que me ayudes a interpretarlos:
+
+- Resultados de normalidad:
+    - Shapiro-Wilk p: {round(sw_p, 4),}
+    - Kolmogorov-Smirnov p: {round(ks_p, 4)}
+    - Jarque-Bera p: {round(jb_p, 4)}
+    - Skewness: {round(jb_skew, 4)}
+    - Kurtosis: {round(jb_kurt, 4)}
+
+- Autocorrelación de residuos:
+    - Durbin-Watson: {round(dw, 4)}
+
+Por favor:
+1. Indica si los residuos cumplen el supuesto de normalidad y explica cómo lo determinas a partir de los valores p y de skewness/kurtosis.
+2. Comenta sobre la presencia de autocorrelación en los residuos usando el valor de Durbin-Watson.
+3. Señala posibles problemas en los supuestos y cómo podrían afectar la interpretación del modelo.
+4. Genera la explicación de forma clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
+5. Incluye recomendaciones prácticas para validar o mejorar el modelo si algún supuesto no se cumple.
+
+"""
+        ia_response_normality = model_ia.generate(prompt_normality)
+
+        promt_breusch_and_white = f"""
+Eres un asistente experto en regresión lineal. Te voy a dar los resultados de las pruebas de heterocedasticidad del modelo, y necesito que me ayudes a interpretarlos:
+
+- Breusch-Pagan:
+    - LM p: {round(bp_test[1], 4)}
+    - F p: {round(bp_test[3], 4)}
+
+- White:
+    - Estadístico: {white_result["stat"]}
+    - p-valor: {white_result["p_value"]}
+    - F-stat: {white_result["f_stat"]}
+    - F p-valor: {white_result["f_p_value"]}
+
+Por favor:
+1. Indica si hay evidencia de heterocedasticidad en los residuos según cada prueba y explica cómo determinas esto a partir de los valores p y estadísticos.
+2. Comenta sobre posibles efectos de la heterocedasticidad en la interpretación de los coeficientes y del modelo.
+3. Si existe heterocedasticidad, sugiere métodos o ajustes para corregirla.
+4. Genera la explicación de manera clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
+
+"""
+        ia_response_breuch_and_white = model_ia.generate(promt_breusch_and_white)
+
+        prompt_vif = f"""
+Eres un asistente experto en regresión lineal. Te voy a dar los resultados de los VIF (Variance Inflation Factor) de cada variable del modelo y necesito que me ayudes a interpretarlos:
+
+- VIF por variable: {vif_str}  # Formato: Variable y el valor
+
+Por favor:
+1. Indica qué variables presentan problemas de multicolinealidad según los valores de VIF y explica los criterios que usas para determinarlo.
+2. Describe cómo la multicolinealidad puede afectar la interpretación de los coeficientes del modelo.
+3. Sugiere posibles soluciones o ajustes para reducir la multicolinealidad si es necesario.
+4. Presenta la explicación de forma clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
+"""
+        ia_response_vif = model_ia.generate(prompt_vif)
 
         return {
             "ok": True,
             "meta": meta,
             "n_obs": int(model.nobs),
-            "n_vars": int(len(model.params) - 1),
+            "dependent_variable": dependent_col,
             "r2": round(r2, 4),
             "r2_adj": round(r2_adj, 4),
             "f_statistic": round(f_stat, 4),
             "f_pvalue": round(f_pvalue, 4),
-            "anova": anova,
-            "coefs": coefs,
-            "dependent_variable": dependent_col,
-            "normality": {
-                "shapiro_p": round(sw_p, 4),
-                "ks_p": round(ks_p, 4),
-                "jarque_bera_p": round(jb_p, 4),
-                "skewness": round(jb_skew, 4),
-                "kurtosis": round(jb_kurt, 4)
-            },
-            "breusch_pagan": {
-                "LM_p": round(bp_test[1], 4),
-                "F_p": round(bp_test[3], 4)
-            },
-            "white_test": white_result,
-            "durbin_watson": round(dw, 4),
-            "vif": vif,
-            "conclusion": conclusion,
-            "interpretacion": ia_response,
-            "results_table": results_table.round(4).to_dict(orient="records"),
+
+            # anova general
             "anova": {
                 "ok": True,
                 "n_data": resultados_anova["n_data"],
@@ -475,16 +563,50 @@ Para cada variable, indica:
                 "global_mean": round(resultados_anova["media_global"], 2),
                 "p_value": round(p_value, 2),
                 "conclusion": conclusion_anova,
-                "sse":  [round(x, 2) for x in resultados_anova["sse"]],
+                "sse": [round(x, 2) for x in resultados_anova["sse"]],
                 "ssb": [round(x, 2) for x in resultados_anova["ssb"]],
                 "sse_string": resultados_anova["sse_string"],
                 "ssb_string": resultados_anova["ssb_string"],
                 "ssb_total": round(resultados_anova["ssb_total"], 2),
-                "sse_total": round(resultados_anova["sse_total"],2),
+                "sse_total": round(resultados_anova["sse_total"], 2),
                 "mse": round(resultados_anova["mse"], 2),
                 "msb": round(resultados_anova["msb"], 2)
-            }
+            },
+
+            # coeficientes
+            "coefs": coefs,
+
+            # supuestos / normalidad
+            "normality": {
+                "shapiro_p": round(sw_p, 4),
+                "ks_p": round(ks_p, 4),
+                "jarque_bera_p": round(jb_p, 4),
+                "skewness": round(jb_skew, 4),
+                "kurtosis": round(jb_kurt, 4)
+            },
+
+            # heterocedasticidad
+            "breusch_pagan": {
+                "LM_p": round(bp_test[1], 4),
+                "F_p": round(bp_test[3], 4)
+            },
+            "white_test": white_result,
+
+            "durbin_watson": round(dw, 4),
+            "vif": vif,
+            "conclusion": conclusion,
+            "results_table": results_table.round(4).to_dict(orient="records"),
+
+            # respuestas de la IA
+
+            "ia_response_general_section": ia_response_general_section,
+            "ia_response_anova_analisis": ia_response_anova_analisis,
+            "ia_response_coefs": ia_response_coefs,
+            "ia_response_normality": ia_response_normality,
+            "ia_response_breuch_and_white": ia_response_breuch_and_white,
+            "ia_response_vif": ia_response_vif
         }
+
 
     except Exception as e:
         import traceback
