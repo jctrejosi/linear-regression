@@ -1,6 +1,6 @@
 from flask import Blueprint
 from scipy.stats import f
-from openai import OpenAI
+from gpt4all import GPT4All
 from pandas.api.types import (
     is_numeric_dtype,
     is_bool_dtype
@@ -16,8 +16,6 @@ from statsmodels.stats.stattools import durbin_watson, jarque_bera
 from scipy.stats import shapiro, kstest
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 bp = Blueprint('bp', __name__)
 
 def is_serial_by_sort(s, tol=0.99):
@@ -419,98 +417,25 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             for v in vif
         ])
 
-        # Prompt para OpenAI
+        # Prompt para la IA
         prompt = f"""
-A continuación, te presento todos los resultados relevantes de una regresión lineal múltiple. Quiero que los interpretes en el **mismo orden** en el que los presento, **sin asumir nada adicional**, y que escribas la respuesta con **títulos visibles para cada sección**, seguidos de una explicación clara, útil y técnica.
+Eres un experto en estadística. Analiza los coeficientes de la regresión que te paso y da una interpretación clara:
 
----
-
-### Resultados de la Regresión Lineal Múltiple
-
-**Coeficientes**
-
-Variable\tCoeficiente\tValor p
+Variable	Coeiciente	Valor p
 {coefs_str}
 
----
+Para cada variable, indica:
+1. Si es estadísticamente significativa.
+2. El efecto que tiene sobre la variable dependiente.
+3. Sugerencias para mejorar el modelo si alguna variable no es significativa.
 
-**Resumen del Modelo**
-
-Observaciones: {len(df)}
-Variables independientes: {X.shape[1]}
-R²: {round(r2, 4)}
-R² ajustado: {round(r2_adj, 4)}
-Estadístico F: {round(f_stat, 4)}
-Valor p del modelo: {round(f_pvalue, 4)}
-Conclusión: {conclusion}
-
----
-
-**Pruebas de Supuestos**
-
-Shapiro-Wilk p: {round(sw_p, 4)}
-Kolmogorov-Smirnov p: {round(ks_p, 4)}
-Jarque-Bera p: {round(jb_p, 4)}
-Skewness: {round(jb_skew, 4)}
-Kurtosis: {round(jb_kurt, 4)}
-Durbin-Watson: {round(dw, 4)}
-
----
-
-**Breusch-Pagan (Heterocedasticidad)**
-
-LM p: {round(bp_test[1], 4)}
-F p: {round(bp_test[3], 4)}
-
----
-
-**White (Heterocedasticidad)**
-
-Estadístico: {white_result.get("stat", "N/A")}
-p-valor: {white_result.get("p_value", "N/A")}
-F-stat: {white_result.get("f_stat", "N/A")}
-F p-valor: {white_result.get("f_p_value", "N/A")}
-
----
-
-**VIF (Multicolinealidad)**
-
-Variable\tVIF
-{vif_str}
-
----
-Tabla de residuos
-{results_table}
-
----
-
-Las instrucciones para cada sección son:
-
-- Primero dame una interpretación de lo que estamos analizando, con ayuda del nombre de las columnas, puedes saber de qué tratan los datos.
-- Muestra los resultados bajo un título claro.
-- Primero, explica brevemente para qué sirve esa sección.
-- Luego, interpreta los resultados específicos que te entrego para cada sección.
-- Debes usar para la respuesta formato .md
-- Explica tanto el valor como el significado del valor de las variables significativas.
-- Con la interpretación de los resultados, propón acciones para mejorar el modelo.
 """
 
-        # ---- Consulta a la api de OPEN.IA ----
-        try:
-            gpt_response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "Eres un experto en estadística."},
-                    {"role": "user", "content": prompt.strip()}
-                ],
-                temperature=0.4,
-                max_tokens=1500
-            )
-            gpt_text = gpt_response.choices[0].message.content
-
-        except Exception as e:
-            gpt_text = None
-            gpt_error = str(e)
+        # Consultar a una IA
+        model_path = "C:/Users/jctre/AppData/Local/nomic.ai/GPT4All/Llama-3.2-1B-Instruct-Q4_0.gguf"
+        # cargar modelo sin intentar descargar
+        model_ia = GPT4All(model_path, allow_download=False)
+        ia_response = model_ia.generate(prompt)
 
         return {
             "ok": True,
@@ -539,7 +464,7 @@ Las instrucciones para cada sección son:
             "durbin_watson": round(dw, 4),
             "vif": vif,
             "conclusion": conclusion,
-            "interpretacion": gpt_text,
+            "interpretacion": ia_response,
             "results_table": results_table.round(4).to_dict(orient="records"),
             "anova": {
                 "ok": True,

@@ -55,6 +55,7 @@ export const LinealRegresion = ({ data }: props) => {
         setMeta(response.meta ?? null);
         setShowMetaModal(true);
       }
+      console.log(typeof response);
       setResult(response);
       setView(true);
     } catch (error: unknown) {

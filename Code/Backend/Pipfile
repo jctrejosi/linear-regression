@@ -14,6 +14,7 @@ statsmodels = "*"
 dotenv = "*"
 xlrd = "*"
 gunicorn = "*"
+gpt4all = "*"
 
 [dev-packages]
 
