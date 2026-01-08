@@ -1,6 +1,5 @@
-from flask import Blueprint
+from flask import Blueprint, json
 from scipy.stats import f
-from gpt4all import GPT4All
 from pandas.api.types import (
     is_numeric_dtype,
     is_bool_dtype
@@ -14,15 +13,25 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.diagnostic import het_breuschpagan, het_white
 from statsmodels.stats.stattools import durbin_watson, jarque_bera
 from scipy.stats import shapiro, kstest
+import requests
+
+def ask_llm(prompt: str) -> str:
+    r = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "qwen2.5:3b",
+            "prompt": prompt,
+            "temperature": 0.2,
+            "num_ctx": 4096,
+            "stream": False
+        },
+    )
+    r.raise_for_status()
+    return r.json()["response"]
 
 load_dotenv()
 bp = Blueprint('bp', __name__)
 
-# Consultar a una IA
-model_path = os.getenv("MODEL_PATH")
-
-# cargar modelo sin intentar descargar
-model_ia = GPT4All(model_path, allow_download=False)
 
 def is_serial_by_sort(s, tol=0.99):
     s = s.dropna()
@@ -99,90 +108,9 @@ def classify_columns(df, dependent=None, max_categories=15):
 
     return info
 
-def run_anova(data):
-    # Transponer filas en columnas
-    columnas = list(zip(*data))
-
-    datos_limpios = []
-    medias = []
-    total_valores = 0
-
-    for columna in columnas:
-        limpios = []
-
-        for valor in columna:
-            if valor is None:
-                continue
-
-            try:
-                num = float(valor)
-                limpios.append(num)
-            except (ValueError, TypeError):
-                continue
-
-        if limpios:
-            datos_limpios.append(limpios)
-            total_valores += len(limpios)
-            media = sum(limpios) / len(limpios)
-            medias.append(media)
-
-    media_global = np.mean([m for m in medias if m is not None])
-
-    # Cálculo de SSB y SSE por grupo
-    ssb_strings = []
-    sse_strings = []
-    ssb = []
-    sse = []
-
-    for i, grupo in enumerate(datos_limpios):
-        ni = len(grupo)
-        media_i = medias[i]
-
-        # === SSB ===
-        ssb_val = ni * (media_i - media_global) ** 2
-        ssb.append(ssb_val)
-        ssb_str = f"{ni} × ({media_i} - {round(media_global, 3)})² = {round(ssb_val, 2)}"
-        ssb_strings.append(ssb_str)
-
-        # === SSE ===
-        sse_val = 0
-        sse_terms = []
-
-        for x in grupo:
-            term = (x - media_i) ** 2
-            sse_val += term
-            sse_terms.append(f"({x} - {media_i})²")
-
-        sse_str = f" + ".join(sse_terms) + f" = {round(sse_val, 2)}"
-        sse.append(round(sse_val, 2))
-        sse_strings.append(sse_str)
-
-        sum_ssb = sum(ssb)
-        sum_sse = sum(sse)
-
-        msb = sum_ssb/(len(columnas) - 1)
-        mse = sum_sse/(total_valores - len(columnas))
-
-    return {
-        "n_data": total_valores,
-        "grupos": datos_limpios,
-        "medias": medias,
-        "media_global": media_global,
-        "ssb_string": ssb_strings,
-        "sse_string": sse_strings,
-        "sse_total": sum_sse,
-        "ssb_total": sum_ssb,
-        "ssb": ssb,
-        "sse": sse,
-        "msb": msb,
-        "mse": mse
-    }
-
 def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.05) -> dict:
     try:
-        # ---------------------------------------------------
-        # limpieza, validación automática de columnas
-        # ---------------------------------------------------
+        # 0) cargar datos en DataFrame
         df_raw = pd.DataFrame(data, columns=columns)
         column_errors = {}         # detalles por columna (ejemplos/filas)
         meta = {
@@ -191,10 +119,10 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             "warnings": [],          # avisos (e.g. dependent reasignado)
             "rows_before": len(df_raw),
             "rows_after": None,
-            "imputed_columns": {},   # columnas imputadas: {col: {"mean":..., "count":...}}
+            "imputed_columns": {},   # columnas imputadas: Llenar valores vacíos
         }
 
-        # 1) Clasificar columnas y eliminar las innecesarias
+        # 1) clasificar columnas y eliminar las innecesarias
         info = classify_columns(df_raw, dependent)
         drop_cols = info["datetime"] + info["id_like"] + info["constant"] + info["serial"] + ['id']
         meta["dropped_columns"] = drop_cols.copy()
@@ -203,7 +131,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         )
         df = df_raw.drop(columns=drop_cols, errors="ignore").copy()
 
-        # 11) detectar columnas constantes resultantes y descartarlas
+        # 2) detectar columnas constantes resultantes y descartarlas
         constant_cols_after = [c for c in df.columns if df[c].nunique() <= 1]
         if constant_cols_after:
             df = df.drop(columns=constant_cols_after, errors="ignore")
@@ -212,7 +140,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 f"Se quitaron columnas constantes tras limpieza: {', '.join(constant_cols_after)}"
             )
 
-        # 7) descartar columnas con demasiados NaN parciales
+        # 3) descartar columnas con demasiados NaN parciales
         nan_ratio = df.isna().mean()
         PARTIAL_NAN_THRESHOLD = 0.10  # 10% de tolerancia para NaN parciales
         cols_with_too_many_nan = nan_ratio[nan_ratio > PARTIAL_NAN_THRESHOLD].index.tolist()
@@ -223,7 +151,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             )
             df = df.drop(columns=cols_with_too_many_nan, errors="ignore")
 
-        # 5) transformar categóricas a dummies y booleanos a 0/1 (si existen)
+        # 4) transformar categóricas a dummies y booleanos a 0/1 (si existen)
         cats_to_dummy = [c for c in info["categorical"] if c in df.columns]
         bool_cols = [c for c in info["boolean"] if c in df.columns]
 
@@ -237,7 +165,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             df[col] = df[col].map({True: 1, False: 0, "True": 1, "False": 0}) # Convertir booleanos a 0/1
             df[col] = df[col].fillna(0).astype(int)
 
-        # Asegurarse de que los datos sean números luego de transformar dummies
+        # 5) asegurarse de que los datos sean números luego de transformar dummies
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -245,7 +173,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
 
         meta["auto_dummies"] = cats_to_dummy.copy()
 
-        # 8) en los valores NaN colocar la media de la columna (imputación)
+        # 6) en los valores NaN colocar la media de la columna (imputación)
         for col in df.columns:
             if df[col].isna().any():
                 # calcular media sin NaN
@@ -258,7 +186,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 df[col].fillna(mean_val, inplace=True)
                 meta["imputed_columns"][col] = {"mean": float(mean_val), "count": count_nan}
 
-        # 10) validar que quedan filas y columnas suficientes
+        # 7) validar que quedan filas y columnas suficientes
         meta["rows_after"] = len(df)
 
         MIN_OBS = 5
@@ -279,7 +207,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 "details": column_errors
             }
 
-        # 13) determinar variable dependiente final
+        # 8) determinar variable dependiente final
         dependent_col = dependent if dependent in df.columns else df.columns[0]
         if dependent_col not in df.columns:
             return {
@@ -289,7 +217,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 "details": column_errors
             }
 
-        # 14) construir y, X desde df_valid (ya limpio y con imputaciones)
+        # 9) construir y, X desde df_valid (ya limpio y con imputaciones)
         df_valid = df.copy()
         y = df_valid[dependent_col]
         X = df_valid.drop(columns=[dependent_col])
@@ -302,9 +230,6 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
                 "details": column_errors
             }
 
-        # ============================================================
-        # 9. agregar constante y ajustar modelo
-        # ============================================================
         X_const = sm.add_constant(X)
         model = sm.OLS(y, X_const).fit()
 
@@ -313,31 +238,24 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         f_stat, f_pvalue = model.fvalue, model.f_pvalue
 
         # Tabla ANOVA
-        resultados_anova = run_anova(data)
+        f_statistic = None
+        p_value = None
+        ssb_total = None
+        sse_total = None
+        msb = None
+        mse = None
 
-        grupos = resultados_anova["grupos"]
-
-        # Verificación: asegurarse de que cada grupo tiene al menos 2 datos
-        if any(len(grupo) < 2 for grupo in grupos):
-            return {"error": "Cada grupo debe tener al menos dos valores."}
-
-        # Aplicar ANOVA
-        k_groups = len(columns)
-        f_statistic = resultados_anova["msb"]/resultados_anova["mse"]
-        df_between = k_groups - 1
-        df_within = resultados_anova["n_data"] - k_groups
-        p_value = 1 - f.cdf(f_statistic, df_between, df_within)
-
-        # Conclusión
-        conclusion_anova = (
-            "Se rechaza la hipótesis nula: hay diferencias significativas entre los grupos."
-            if p_value < alpha else
-            "No se rechaza la hipótesis nula: no hay diferencias significativas entre los grupos."
-        )
-
-        # Tabla ANOVA
         try:
             anova_tbl = sm.stats.anova_lm(model)
+            ssb_total = anova_tbl["sum_sq"][:-1].sum()  # suma de variables explicativas
+            sse_total = anova_tbl["sum_sq"][-1]         # suma de cuadrados residuales
+            msb = (ssb_total / (len(anova_tbl)-1))
+            mse = (sse_total / anova_tbl["df"][-1])
+            f_statistic = msb / mse
+            p_value = 1 - f.cdf(f_statistic, len(anova_tbl)-1, anova_tbl["df"][-1])
+            n_data = int(model.nobs)
+            k_groups = len(anova_tbl)-1
+            means = [round(model.params[var],2) for var in model.params.index if var != 'const']
             anova = {
                 idx: {
                     "df": float(row["df"]),
@@ -423,125 +341,139 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             for v in vif
         ])
 
-        # Prompts para la IA
-        prompt_general_section = f"""
-Eres un asistente experto en estadística y análisis de regresión lineal. Te voy a proporcionar los resultados generales de un modelo de regresión lineal. Quiero que me expliques de manera clara y didáctica cada uno de estos resultados:
+        anova_str = json.dumps(anova, indent=2)
 
-- Número de observaciones: {int(model.nobs)}
+        prompt_full_analysis = f"""
+Eres un asistente experto en estadística aplicada, regresión lineal y análisis ANOVA.
+Tu misión: explicar de forma técnica y, al mismo tiempo, comprensible para una persona sin formación previa en estadística.
+Usa lenguaje claro, frases completas, ejemplos sencillos y analogías cuando ayude a entender, pero ve directo al punto técnico. Mantén los nombres de las variables exactamente como te las doy (por ejemplo: {dependent_col}, {coefs_str}, {vif_str}, {anova_str}).
+
+FORMATO GENERAL Y REGLAS
+- Entrega la respuesta en **markdown** con encabezados claros (`##`, `###`) y listas cuando convenga.
+- Inicia con un **resumen ejecutivo corto (2–4 frases)** que responda: ¿el modelo sirve? ¿qué decisión práctica sugiere?
+- Para cada sección principal ofrece:
+  1. una **explicación simple** (3–6 oraciones) para un usuario sin experiencia,
+  2. una **explicación técnica** (3–6 oraciones) para alguien con conocimiento básico,
+  3. **consecuencias prácticas** y **recomendaciones** (2–4 puntos accionables).
+- Si hay resultados preocupantes (p-values altos, VIF altos, heterocedasticidad), explícala claramente y da **3 acciones concretas** (qué hacer ahora).
+- Evita fórmulas complejas; si necesitas mencionar una fórmula, hazlo en lenguaje natural o en una nota técnica al final.
+- Si alguna sección no aplica o los cálculos no son posibles, indica claramente “No aplica” y por qué.
+
+==============================
+0. resumen ejecutivo (inicio)
+==============================
+- 2–4 frases: respuesta directa sobre utilidad del modelo y recomendaciones prioritarias.
+
+==============================
+1. resumen general del modelo
+==============================
+Datos clave:
+- Observaciones usadas: {int(model.nobs)}
 - Variable dependiente: {dependent_col}
 - R²: {r2}
 - R² ajustado: {r2_adj}
-- Estadístico F: {f_statistic}
+- Estadístico F del modelo: {f_statistic}
 - Valor p del modelo: {f_pvalue}
 
-Por favor:
-1. Explica qué significa cada métrica.
-2. Indica si los valores sugieren que el modelo es bueno o no.
-3. Señala cualquier advertencia o consideración sobre la interpretación.
-4. Ofrece un resumen final comprensible para alguien con conocimientos básicos de estadística.
+Para esta sección, por favor:
+1. Explica en lenguaje sencillo qué es cada métrica (R², R² ajustado, F, p).
+2. Di si esos valores indican que el modelo captura bien la variación de la variable dependiente.
+3. Señala, en términos prácticos, qué significa para un cliente (por ejemplo: "este modelo explica X% de la variación; eso es suficiente si...").
+4. Aporta 2–3 recomendaciones concretas y priorizadas (p. ej. recolectar más datos, revisar variables, transformar Y).
 
-Devuelve la explicación en un lenguaje claro y estructurado, evitando fórmulas complicadas y ejemplos innecesarios.
+==============================
+2. anova del modelo (anova_lm)
+==============================
+Tabla ANOVA (modelo de regresión):
+{anova_str}
+
+Notas rápidas:
+- Explica brevemente qué mide esta tabla (qué representa cada fila y columna).
+- Para CADA fila relevante (variables con PR(>F) pequeña):
+  - Indica en lenguaje claro si la variable aporta de forma significativa.
+  - Explica la magnitud relativa de su contribución (sin fórmulas).
+- Señala variables que NO aportan y por qué podría ocurrir (colinealidad, baja varianza).
+- Consejos prácticos: 2–3 acciones (quitar variable, combinar categorías, recolectar más datos).
+
+==============================
+3. interpretación de coeficientes
+==============================
+Coeficientes (variable, coeficiente, p-valor):
+{coefs_str}
+
+Para cada coeficiente (hazlo en una lista ordenada):
+1. explicación sencilla: ¿qué indica este número para el cliente? (ej.: "un aumento de 1 unidad en X se asocia con ...")
+2. interpretación técnica: signo, magnitud y p-valor (si es significativo).
+3. recomendación práctica si aplica (ej.: verificar escala, estandarizar, transformar).
+
+Si hay coeficientes con p > 0.05, explica qué significa “no significativo” en términos no técnicos y qué hacer.
+
+==============================
+4. supuestos del modelo (residuos)
+==============================
+Resultados:
+- Shapiro-Wilk p: {round(sw_p, 4)}
+- Kolmogorov-Smirnov p: {round(ks_p, 4)}
+- Jarque-Bera p: {round(jb_p, 4)}
+- Skewness: {round(jb_skew, 4)}
+- Kurtosis: {round(jb_kurt, 4)}
+- Durbin-Watson: {round(dw, 4)}
+
+Para esta sección:
+- Explica en términos simples qué significan “residuos normales” y por qué importa.
+- Para cada test, di en lenguaje llano si su resultado sugiere problema (sí/no) y por qué.
+- Indica consecuencias prácticas (ej.: intervalos de confianza inexactos, tests poco fiables).
+- Recomienda 3 soluciones prácticas si hay problemas (transformaciones, errores robustos, bootstrap, modelado alternativo).
+
+==============================
+5. heterocedasticidad
+==============================
+Resultados:
+- Breusch-Pagan: LM p = {round(bp_test[1], 4)}, F p = {round(bp_test[3], 4)}
+- White: estadístico = {white_result["stat"]}, p-valor = {white_result["p_value"]}
+
+Tareas:
+- Explica claramente qué es heterocedasticidad con una metáfora simple.
+- Indica si hay evidencia de heterocedasticidad y las implicaciones prácticas.
+- Propón 3 soluciones ordenadas por simplicidad y efectividad (ej.: errores robustos, transformación log, modelar varianza).
+
+==============================
+6. multicolinealidad (VIF)
+==============================
+Resultados VIF:
+{vif_str}
+
+Tareas:
+- Explica qué es VIF y por qué valores altos preocupan (en lenguaje no técnico).
+- Enumera variables con VIF problemático y qué significa para sus coeficientes.
+- Da 3 opciones prácticas para mitigarlo (remover variables, combinar, PCA / reducir dimensionalidad).
+
+==============================
+7. conclusiones y pasos siguientes (priorizados)
+==============================
+- 4–6 bullets con acciones concretas y priorizadas (qué hacer primero, qué puede esperar el cliente).
+- Incluye una recomendación sobre si repetir el análisis tras cambios y qué medir.
+
+==============================
+APÉNDICE TÉCNICO (breve)
+==============================
+- Significancia global del modelo: evalúa si, en conjunto, las variables explicativas aportan información sobre la variable dependiente. El estadístico F y su p-valor indican si podemos confiar en que el modelo no se ajusta por azar.
+- Contribución relativa de cada variable: analiza qué variables tienen efectos fuertes o débiles, considerando tanto el coeficiente como su significancia estadística (p < 0.05).
+- Multicolinealidad: valores altos de VIF sugieren que algunas variables explicativas están fuertemente correlacionadas. Esto puede inflar errores estándar, dificultando la interpretación de coeficientes.
+- Supuestos del modelo: normalidad de residuos, homocedasticidad y ausencia de autocorrelación. Cada violación afecta la fiabilidad de inferencias y predicciones.
+- Heterocedasticidad y robustez: si hay evidencia de heterocedasticidad, los errores estándar convencionales pueden ser inexactos, afectando los intervalos de confianza y la significancia de los coeficientes.
+- Residuos y ajustes del modelo: la revisión de residuos permite identificar valores atípicos, patrones no lineales o variables omitidas que podrían mejorar el modelo.
+- Coeficientes y dirección de efecto: interpretar correctamente el signo (positivo/negativo) y magnitud de cada coeficiente en contexto, considerando la escala de la variable.
+- Recomendaciones técnicas: transformar variables si la relación es no lineal, estandarizar si las escalas son muy diferentes, revisar outliers y, si es necesario, considerar interacciones entre variables.
+
+REGLAS FINALES
+- No cambies ni inventes nombres de variables; usa exactamente las variables que te pasaron.
+- La salida debe ser explicativa pero utilizable directamente en HTML/Markdown.
+- Prioriza la claridad para usuarios sin formación en estadística, pero incluye la capa técnica para usuarios intermedios.
+- Asegúrate de cerrarlo con una **sección de recomendaciones prácticas priorizadas**.
 """
 
-        ia_response_general_section = model_ia.generate(prompt_general_section)
-
-        prompt_anova_analisis = f"""
-Eres un asistente experto en estadística y análisis de datos. Te voy a dar los resultados de un análisis ANOVA (one-way) y necesito que me expliques de manera clara y detallada qué significa cada resultado:
-
-- Número de grupos (k): {k_groups}
-- Número total de datos (N): {resultados_anova["n_data"]}
-- Estadístico F: {round(f_statistic, 2)}
-- Valor p: {p_value}
-- Medias de cada grupo: {[round(x, 2) for x in resultados_anova["medias"]]}
-- Media global: {round(resultados_anova["media_global"], 2)}
-- Conclusión del test: {conclusion}
-
-Por favor:
-1. Explica qué indica el estadístico F y cómo se interpreta.
-2. Explica el significado del valor p y qué nos dice sobre las diferencias entre grupos.
-3. Comenta si las medias de los grupos muestran diferencias significativas.
-4. Ofrece una conclusión clara y práctica sobre lo que implica este análisis para los datos.
-5. Utiliza un lenguaje comprensible para alguien con conocimientos básicos de estadística, evitando fórmulas complejas.
-
-Genera la explicación de forma estructurada y didáctica.
-"""
-        ia_response_anova_analisis = model_ia.generate(prompt_anova_analisis)
-
-        prompt_coefs = f"""
-Eres un asistente experto en análisis de regresión lineal. Te voy a dar los coeficientes de un modelo y necesito que me expliques qué significa cada uno:
-
-- Variable dependiente: {dependent_col}
-- Lista de coeficientes: {coefs_str}
-(cada elemento incluye: nombre de la variable, valor del coeficiente y valor p)
-
-Por favor:
-1. Explica cómo interpretar cada coeficiente en relación con la variable dependiente.
-2. Indica qué nos dice el valor p sobre la significancia de cada coeficiente.
-3. Comenta cuáles variables son estadísticamente significativas y cuáles no.
-4. Describe si los coeficientes positivos o negativos tienen sentido en el contexto de los datos.
-5. Genera la explicación de forma clara, estructurada y comprensible para alguien con conocimientos básicos de estadística.
-
-Incluye ejemplos concretos si es posible y ofrece conclusiones prácticas sobre el modelo.
-"""
-        ia_response_coefs = model_ia.generate(prompt_coefs)
-
-        prompt_normality = f"""
-Eres un asistente experto en regresión lineal. Te voy a dar los resultados de las pruebas de supuestos del modelo, y necesito que me ayudes a interpretarlos:
-
-- Resultados de normalidad:
-    - Shapiro-Wilk p: {round(sw_p, 4),}
-    - Kolmogorov-Smirnov p: {round(ks_p, 4)}
-    - Jarque-Bera p: {round(jb_p, 4)}
-    - Skewness: {round(jb_skew, 4)}
-    - Kurtosis: {round(jb_kurt, 4)}
-
-- Autocorrelación de residuos:
-    - Durbin-Watson: {round(dw, 4)}
-
-Por favor:
-1. Indica si los residuos cumplen el supuesto de normalidad y explica cómo lo determinas a partir de los valores p y de skewness/kurtosis.
-2. Comenta sobre la presencia de autocorrelación en los residuos usando el valor de Durbin-Watson.
-3. Señala posibles problemas en los supuestos y cómo podrían afectar la interpretación del modelo.
-4. Genera la explicación de forma clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
-5. Incluye recomendaciones prácticas para validar o mejorar el modelo si algún supuesto no se cumple.
-
-"""
-        ia_response_normality = model_ia.generate(prompt_normality)
-
-        promt_breusch_and_white = f"""
-Eres un asistente experto en regresión lineal. Te voy a dar los resultados de las pruebas de heterocedasticidad del modelo, y necesito que me ayudes a interpretarlos:
-
-- Breusch-Pagan:
-    - LM p: {round(bp_test[1], 4)}
-    - F p: {round(bp_test[3], 4)}
-
-- White:
-    - Estadístico: {white_result["stat"]}
-    - p-valor: {white_result["p_value"]}
-    - F-stat: {white_result["f_stat"]}
-    - F p-valor: {white_result["f_p_value"]}
-
-Por favor:
-1. Indica si hay evidencia de heterocedasticidad en los residuos según cada prueba y explica cómo determinas esto a partir de los valores p y estadísticos.
-2. Comenta sobre posibles efectos de la heterocedasticidad en la interpretación de los coeficientes y del modelo.
-3. Si existe heterocedasticidad, sugiere métodos o ajustes para corregirla.
-4. Genera la explicación de manera clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
-
-"""
-        ia_response_breuch_and_white = model_ia.generate(promt_breusch_and_white)
-
-        prompt_vif = f"""
-Eres un asistente experto en regresión lineal. Te voy a dar los resultados de los VIF (Variance Inflation Factor) de cada variable del modelo y necesito que me ayudes a interpretarlos:
-
-- VIF por variable: {vif_str}  # Formato: Variable y el valor
-
-Por favor:
-1. Indica qué variables presentan problemas de multicolinealidad según los valores de VIF y explica los criterios que usas para determinarlo.
-2. Describe cómo la multicolinealidad puede afectar la interpretación de los coeficientes del modelo.
-3. Sugiere posibles soluciones o ajustes para reducir la multicolinealidad si es necesario.
-4. Presenta la explicación de forma clara y estructurada, comprensible para alguien con conocimientos básicos de estadística.
-"""
-        ia_response_vif = model_ia.generate(prompt_vif)
+        ia_response = ask_llm(prompt_full_analysis)
 
         return {
             "ok": True,
@@ -553,24 +485,20 @@ Por favor:
             "f_statistic": round(f_stat, 4),
             "f_pvalue": round(f_pvalue, 4),
 
-            # anova general
+            # anova
             "anova": {
                 "ok": True,
-                "n_data": resultados_anova["n_data"],
+                "n_data": n_data,
                 "k_groups": k_groups,
                 "f_statistics": round(f_statistic, 2),
-                "means": [round(x, 2) for x in resultados_anova["medias"]],
-                "global_mean": round(resultados_anova["media_global"], 2),
-                "p_value": round(p_value, 2),
-                "conclusion": conclusion_anova,
-                "sse": [round(x, 2) for x in resultados_anova["sse"]],
-                "ssb": [round(x, 2) for x in resultados_anova["ssb"]],
-                "sse_string": resultados_anova["sse_string"],
-                "ssb_string": resultados_anova["ssb_string"],
-                "ssb_total": round(resultados_anova["ssb_total"], 2),
-                "sse_total": round(resultados_anova["sse_total"], 2),
-                "mse": round(resultados_anova["mse"], 2),
-                "msb": round(resultados_anova["msb"], 2)
+                "means": means,
+                "global_mean": round(model.model.endog.mean(), 2),
+                "p_value": round(p_value, 4),
+                "conclusion": "Se rechaza H0" if p_value < 0.05 else "No se rechaza H0",
+                "ssb_total": round(ssb_total,2),
+                "sse_total": round(sse_total,2),
+                "msb": round(msb,2),
+                "mse": round(mse,2)
             },
 
             # coeficientes
@@ -599,12 +527,7 @@ Por favor:
 
             # respuestas de la IA
 
-            "ia_response_general_section": ia_response_general_section,
-            "ia_response_anova_analisis": ia_response_anova_analisis,
-            "ia_response_coefs": ia_response_coefs,
-            "ia_response_normality": ia_response_normality,
-            "ia_response_breuch_and_white": ia_response_breuch_and_white,
-            "ia_response_vif": ia_response_vif
+            "ia_response": ia_response,
         }
 
 

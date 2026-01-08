@@ -1,5 +1,5 @@
 import type { TableFile } from "@/@types";
-import type { AnovaResult } from "./services/lineal_regression";
+import type { AnovaResult } from "../services/lineal_regression";
 
 type Props = {
   result: AnovaResult | null;

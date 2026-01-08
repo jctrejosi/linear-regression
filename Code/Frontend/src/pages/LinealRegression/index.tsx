@@ -1,18 +1,14 @@
 import type { TableFile } from "@/@types";
 import { useState, useEffect } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { FaEye } from "react-icons/fa";
 import { FiFileText } from "react-icons/fi";
 
-import {
-  set_regression,
-  type RegressionMeta,
-  type RegressionResponse,
-} from "./services/lineal_regression";
+import { type RegressionMeta, type RegressionResponse } from "./types";
 import axios from "axios";
-import { MetaModal } from "./MetaModal";
-import { AnovaResultsTable } from "./AnovaResultsTable";
+import { MetaModal } from "./components/MetaModal";
+import { AnovaResultsTable } from "./components/AnovaResultsTable";
+import { set_regression } from "./services/lineal_regression";
+import { IaAnalysisModal } from "./components/IaAnalysisModal";
 
 type props = {
   data: TableFile | undefined;
@@ -25,8 +21,8 @@ export const LinealRegresion = ({ data }: props) => {
   );
   const [dependent, setDependent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [meta, setMeta] = useState<RegressionMeta>({} as RegressionMeta);
   const [showMetaModal, setShowMetaModal] = useState(false);
+  const [showIaModal, setShowIaModal] = useState(false);
 
   // Inicializar dependent con la primera columna disponible
   useEffect(() => {
@@ -52,11 +48,11 @@ export const LinealRegresion = ({ data }: props) => {
         dependent,
       });
       if (response.meta) {
-        setMeta(response.meta ?? null);
         setShowMetaModal(true);
       }
       setResult(response);
       setView(true);
+      if (response.ia_response) setShowIaModal(true);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const data = error.response?.data as {
@@ -64,7 +60,6 @@ export const LinealRegresion = ({ data }: props) => {
           details?: Record<string, unknown>;
           meta: RegressionMeta;
         };
-        setMeta(data.meta);
         setShowMetaModal(true);
 
         console.error("Error regresión:", data);
@@ -125,19 +120,28 @@ export const LinealRegresion = ({ data }: props) => {
         </label>
       </div>
 
-      {/* Modal */}
+      {/*-----------------------------------
+      --------- Modal de resultados --------
+      --------------------------------------*/}
+
       {view && result.ok && (
         <div
           id="results-modal"
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 gap-3"
         >
-          {meta && (
-            <MetaModal
-              meta={meta}
-              open={showMetaModal}
-              onClose={() => setShowMetaModal(false)}
-            />
-          )}
+          {/* Meta - Informe de limpieza de datos */}
+          <MetaModal
+            meta={result.meta}
+            open={showMetaModal}
+            onClose={() => setShowMetaModal(false)}
+          />
+
+          {/* IA - Interpretación de VIF*/}
+          <IaAnalysisModal
+            open={showIaModal}
+            onClose={() => setShowIaModal(false)}
+            content={result.ia_response}
+          />
           <div
             id="result-text"
             className="relative bg-white w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg shadow-lg p-6 pt-0"
@@ -152,7 +156,7 @@ export const LinealRegresion = ({ data }: props) => {
               </button>
             </div>
 
-            {/* Título y botón ver meta data*/}
+            {/* Título y botones para ver información adicional */}
             <div className="flex items-center gap-4 mb-6">
               <h1 className="text-2xl font-semibold">
                 Resultados de la regresión lineal
@@ -170,6 +174,17 @@ export const LinealRegresion = ({ data }: props) => {
                 ver filtrado de datos
               </button>
 
+              <button
+                onClick={() => setShowIaModal(true)}
+                className="flex items-center gap-2 px-3 py-2 text-sm
+                text-blue-700 bg-blue-50 border border-blue-200
+                rounded hover:bg-blue-100"
+                title="ver interpretación de resultados"
+              >
+                <FiFileText size={18} />
+                ver interpretación de resultados
+              </button>
+
               {/* Botón para descargar un pdf de los datos 
               <button
                 onClick={printModal}
@@ -185,43 +200,93 @@ export const LinealRegresion = ({ data }: props) => {
             </div>
 
             {/* Sección de resultados generales */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-700">
-                <p>
-                  <strong>Observaciones:</strong> {result.n_obs}
-                </p>
-                <p>
-                  <strong>Variable independiente:</strong>{" "}
-                  {result.dependent_variable}
-                </p>
-                <p>
-                  <strong>R²:</strong> {result.r2}
-                </p>
-                <p>
-                  <strong>R² ajustado:</strong> {result.r2_adj}
-                </p>
-                <p>
-                  <strong>Estadístico F:</strong> {result.f_statistic}
-                </p>
-                <p>
-                  <strong>Valor p del modelo:</strong> {result.f_pvalue}
-                </p>
-                <p className="col-span-full">
-                  <strong>Conclusión:</strong> {result.conclusion}
-                </p>
-              </div>
-            </div>
-
-            {/* IA - Interpretación de resultados generales */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación de resultados generales
+            <div className="bg-gray-50 p-6 rounded-xl shadow-md space-y-6">
+              {/* título principal */}
+              <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4">
+                Resultados generales del análisis
               </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_general_section}
-                </ReactMarkdown>
+
+              {/* Hipótesis ANOVA */}
+              <div className="bg-white p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  Hipótesis ANOVA
+                </h3>
+                <p className="text-gray-700">
+                  <span className="font-semibold">H0:</span> Las medias de los
+                  tres métodos son iguales.
+                </p>
+                <p className="text-gray-700">
+                  <span className="font-semibold">H1:</span> Al menos una media
+                  es diferente.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-4 text-gray-700 text-sm">
+                  <p>
+                    <span className="font-semibold">Total de grupos (k):</span>{" "}
+                    {result.anova.k_groups}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Total de datos (N):</span>{" "}
+                    {result.anova.n_data}
+                  </p>
+                </div>
               </div>
+
+              {/* métricas generales del modelo */}
+              <div className="bg-white p-4 rounded-lg border-l-4 border-green-500 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                  Métricas del modelo
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-gray-700 text-sm">
+                  <p>
+                    <span className="font-semibold">Observaciones:</span>{" "}
+                    {result.n_obs}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Variable dependiente:</span>{" "}
+                    {result.dependent_variable}
+                  </p>
+                  <p>
+                    <span className="font-semibold">R²:</span> {result.r2}
+                  </p>
+                  <p>
+                    <span className="font-semibold">R² ajustado:</span>{" "}
+                    {result.r2_adj}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Estadístico F:</span>{" "}
+                    {result.f_statistic}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Valor p del modelo:</span>{" "}
+                    {result.f_pvalue}
+                  </p>
+                  <p className="col-span-full bg-green-100 p-2 rounded text-gray-800 font-medium">
+                    <span className="font-semibold">Conclusión:</span>{" "}
+                    {result.conclusion}
+                  </p>
+                </div>
+              </div>
+
+              {/* Opcional: agregar sección de medias por grupo */}
+              {result.anova.means && (
+                <div className="bg-white p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    Medias por grupo
+                  </h3>
+                  <div className="flex flex-wrap gap-4 text-gray-700 text-sm">
+                    {result.anova.means.map((m, i) => (
+                      <p key={i}>
+                        <span className="font-semibold">Grupo {i + 1}:</span>{" "}
+                        {m}
+                      </p>
+                    ))}
+                    <p className="w-full mt-2">
+                      <span className="font-semibold">Media global:</span>{" "}
+                      {result.anova.global_mean}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* ANOVA */}
@@ -232,27 +297,6 @@ export const LinealRegresion = ({ data }: props) => {
                 </h2>
 
                 <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded border border-gray-200">
-                    <p className="text-gray-700">
-                      <span className="font-semibold">H0:</span> Las medias de
-                      los tres métodos son iguales.
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">H1:</span> Al menos una
-                      media es diferente.
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">
-                        Total de grupos (k):
-                      </span>{" "}
-                      {result.anova.k_groups}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Total de datos (N):</span>{" "}
-                      {result.anova.n_data}
-                    </p>
-                  </div>
-
                   <AnovaResultsTable data={data} result={result.anova} />
 
                   <div className="bg-gray-50 p-4 rounded border border-gray-200 space-y-2">
@@ -293,18 +337,6 @@ export const LinealRegresion = ({ data }: props) => {
               </div>
             )}
 
-            {/* IA - Interpretación del análisis anova */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación del análisis ANOVA
-              </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_anova_analisis}
-                </ReactMarkdown>
-              </div>
-            </div>
-
             {/* Coeficientes */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow mb-4">
               <h2 className="text-lg font-semibold mb-2">Coeficientes</h2>
@@ -343,18 +375,6 @@ export const LinealRegresion = ({ data }: props) => {
               </table>
             </div>
 
-            {/* IA - Interpretación de coeficientes */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación de los coeficientes
-              </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_coefs}
-                </ReactMarkdown>
-              </div>
-            </div>
-
             {/* Pruebas de supuestos (normality) */}
             <div className="bg-gray-50 p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
@@ -380,18 +400,6 @@ export const LinealRegresion = ({ data }: props) => {
                 <p>
                   <strong>Durbin-Watson:</strong> {result.durbin_watson}
                 </p>
-              </div>
-            </div>
-
-            {/* IA - Interpretación de pruebas de supuestos (normality) */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación de prueba de supuestos
-              </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_normality}
-                </ReactMarkdown>
               </div>
             </div>
 
@@ -434,18 +442,6 @@ export const LinealRegresion = ({ data }: props) => {
               </div>
             </div>
 
-            {/* IA - Interpretación de breuch-pegan y while*/}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación de Breusch-Pegan y prueba de White
-              </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_breuch_and_white}
-                </ReactMarkdown>
-              </div>
-            </div>
-
             {/* VIF */}
             <div className="overflow-x-auto bg-white p-4 rounded-lg shadow">
               <h2 className="text-lg font-semibold mb-2">
@@ -478,18 +474,6 @@ export const LinealRegresion = ({ data }: props) => {
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            {/* IA - Interpretación de VIF*/}
-            <div className="bg-gray-50 p-4 rounded-lg shadow mb-4">
-              <h2 className="text-lg font-semibold mb-2">
-                Interpretación de VIF
-              </h2>
-              <div className="prose max-w-full">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {result.ia_response_vif}
-                </ReactMarkdown>
-              </div>
             </div>
 
             {/* Tabla de residuos */}
