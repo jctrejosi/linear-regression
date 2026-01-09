@@ -15,7 +15,7 @@ import os
 import requests
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 def ask_llm(prompt: str) -> str:
     r = requests.post(
