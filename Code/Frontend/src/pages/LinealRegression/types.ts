@@ -1,21 +1,28 @@
 export type AnovaResult = {
   ok: boolean;
-  f_statistics: number;
+
+  // tamaños
+  n_obs: number; // número de observaciones
+  n_predictors: number; // número de variables independientes (sin constante)
+
+  // sumas de cuadrados
+  ss_regression: number; // SSR
+  ss_error: number; // SSE
+  ss_total: number; // SST = SSR + SSE
+
+  // cuadrados medios
+  ms_regression: number; // MSR
+  ms_error: number; // MSE
+
+  // test F global del modelo
+  f_statistic: number;
   p_value: number;
+
+  // decisión estadística
   conclusion: string;
+
+  // opcional en caso de error
   error?: string;
-  means: number[];
-  global_mean: number;
-  n_data: number;
-  k_groups: number;
-  ssb: number[];
-  sse: number[];
-  sse_string: string[];
-  ssb_string: string[];
-  ssb_total: number;
-  sse_total: number;
-  mse: number;
-  msb: number;
 };
 
 export type RegressionMeta = {
@@ -41,7 +48,7 @@ export type RegressionResponse = {
   f_statistic: number;
   f_pvalue: number;
   anova: AnovaResult;
-  coefs: {
+  coefficients: {
     variable: string;
     coef: number;
     p_value: number;

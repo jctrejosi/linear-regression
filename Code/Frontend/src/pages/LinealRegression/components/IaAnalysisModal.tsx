@@ -11,7 +11,7 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-40 flex items-center justify-center">
       {/* overlay */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
@@ -20,7 +20,7 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
         {/* header */}
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <h2 className="text-lg font-semibold">
-            interpretación estadística del modelo
+            Explicación de los resultados de la regresión
           </h2>
           <button
             onClick={onClose}

@@ -1,5 +1,5 @@
 import type { TableFile } from "@/@types";
-import type { AnovaResult } from "../services/lineal_regression";
+import type { AnovaResult } from "../types";
 
 type Props = {
   result: AnovaResult | null;
@@ -47,43 +47,47 @@ export const AnovaResultsTable = ({ result, data }: Props) => {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {columnas.map((colData, colIndex) => {
-            const grupo = data.columns[colIndex];
-            const valores = colData.filter((v) => v !== null && v !== "") as (
-              | string
-              | number
-            )[];
-            const valoresStr = valores.map((v) => v.toString()).join(", ");
-            const media = result.means[colIndex];
-            const sse = result.sse[colIndex];
-            const ssb = result.ssb[colIndex];
-            const sse_str = result.sse_string[colIndex];
-            const ssb_str = result.ssb_string[colIndex];
+          {/* regresión */}
+          <tr className="hover:bg-gray-50 transition">
+            <td className="px-4 py-2 text-sm text-gray-700">
+              regresión (modelo)
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              variables explicativas
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              {result.ms_regression}
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              {result.ss_regression}
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">—</td>
+          </tr>
 
-            return (
-              <tr key={colIndex} className="hover:bg-gray-50 transition">
-                <td className="px-4 py-2 text-sm text-gray-700">{grupo}</td>
-                <td className="px-4 py-2 text-sm text-gray-700 max-w-xs overflow-x-auto whitespace-nowrap">
-                  {valoresStr}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700">
-                  {media !== undefined ? media.toFixed(2) : "—"}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700" title={sse_str}>
-                  {sse}
-                </td>
-                <td className="px-4 py-2 text-sm text-gray-700" title={ssb_str}>
-                  {ssb}
-                </td>
-              </tr>
-            );
-          })}
+          {/* error */}
+          <tr className="hover:bg-gray-50 transition">
+            <td className="px-4 py-2 text-sm text-gray-700">
+              error (residuos)
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              variabilidad no explicada
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              {result.ms_error}
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">
+              {result.ss_error}
+            </td>
+            <td className="px-4 py-2 text-sm text-gray-700">—</td>
+          </tr>
+
+          {/* total */}
           <tr className="bg-gray-50 font-semibold">
-            <td className="px-4 py-2">Total / Global</td>
+            <td className="px-4 py-2">total</td>
             <td className="px-4 py-2"></td>
-            <td className="px-4 py-2">{result.global_mean}</td>
-            <td className="px-4 py-2">{result.sse_total}</td>
-            <td className="px-4 py-2">{result.ssb_total}</td>
+            <td className="px-4 py-2">—</td>
+            <td className="px-4 py-2">{result.ss_total}</td>
+            <td className="px-4 py-2">—</td>
           </tr>
         </tbody>
       </table>
