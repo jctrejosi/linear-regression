@@ -11,11 +11,15 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.diagnostic import het_breuschpagan, het_white
 from statsmodels.stats.stattools import durbin_watson, jarque_bera
 from scipy.stats import shapiro, kstest
+import os
 import requests
+
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
 
 def ask_llm(prompt: str) -> str:
     r = requests.post(
-        "http://ollama:11434/api/generate",
+        f"{OLLAMA_URL}/api/generate",
         json={
             "model": "qwen2.5:3b",
             "prompt": prompt,
@@ -26,9 +30,6 @@ def ask_llm(prompt: str) -> str:
     )
     r.raise_for_status()
     return r.json()["response"]
-
-load_dotenv()
-bp = Blueprint('bp', __name__)
 
 def safe_round(value):
     return round(value, 2) if value is not None else None
