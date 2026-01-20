@@ -128,7 +128,7 @@ export const LinealRegresion = ({ data }: props) => {
       --------- Modal de resultados --------
       --------------------------------------*/}
 
-      {view && result.ok && (
+      {view && result?.ok && (
         <div
           id="results-modal"
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 gap-3"
