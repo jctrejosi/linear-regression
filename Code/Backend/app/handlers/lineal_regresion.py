@@ -12,6 +12,32 @@ from scipy.stats import shapiro, kstest
 import os
 import requests
 
+def ask_llm_external(prompt: str) -> str:
+    groq_key = os.getenv("GROQ_API_KEY")
+    if not groq_key:
+        return "Servicio de IA externo no configurado"
+
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "mixtral-8x7b-32768",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.2,
+            },
+            timeout=6
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    except Exception:
+        return "No se pudo generar respuesta con IA externa"
+
 
 def ask_llm(prompt: str) -> str:
     ollama_url = os.getenv("OLLAMA_URL")
@@ -392,10 +418,10 @@ Datos clave:
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
 """
 
-        try:
-            ia_response = ask_llm(prompt_full_analysis)
-        except Exception:
-            ia_response = "No se pudo generar respuesta de IA"
+        ia_response = ask_llm(prompt_full_analysis)
+
+        if ia_response.startswith("No se pudo") or ia_response.startswith("Servicio de IA"):
+            ia_response = ask_llm_external(prompt_full_analysis)
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
