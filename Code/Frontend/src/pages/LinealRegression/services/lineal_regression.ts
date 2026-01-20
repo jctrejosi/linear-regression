@@ -9,10 +9,9 @@ type DataSend = {
 
 export const set_regression = async (data: DataSend) => {
   try {
-    const res = await axios.post<RegressionResponse>(
-      "http://localhost:5000/api/v1.0/regression",
-      { ...data }
-    );
+    const res = await axios.post<RegressionResponse>("api/v1.0/regression", {
+      ...data,
+    });
     return res.data;
   } catch (err) {
     console.error(err);
