@@ -288,17 +288,26 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         bp_test = het_breuschpagan(resid, X_const)
         white_test = None
         white_result = {}
+
+        MAX_WHITE_FEATURES = 8
+
         try:
-            white_test = het_white(resid, X_const)
-            white_result = {
-                "stat": safe_round(white_test[0]),
-                "p_value": safe_round(white_test[1]),
-                "f_stat": safe_round(white_test[2]),
-                "f_p_value": safe_round(white_test[3])
-            }
+            if X_const.shape[1] <= MAX_WHITE_FEATURES:
+                white_test = het_white(resid, X_const)
+                white_result = {
+                    "stat": safe_round(white_test[0]),
+                    "p_value": safe_round(white_test[1]),
+                    "f_stat": safe_round(white_test[2]),
+                    "f_p_value": safe_round(white_test[3]),
+                }
+            else:
+                white_result = {
+                    "skipped": True,
+                    "reason": f"White test omitido: demasiadas variables ({X_const.shape[1]})"
+                }
         except Exception:
             white_result = {
-                "error": "No se pudo calcular la prueba de White (posible colinealidad exacta)."
+                "error": "White test falló por colinealidad o límites de memoria"
             }
 
         # Durbin-Watson
@@ -377,7 +386,7 @@ Datos clave:
 - Kurtosis: {safe_round(jb_kurt)}
 - Durbin-Watson: {safe_round(dw)}
 - Breusch-Pagan: LM p = {safe_round(bp_test[1])}, F p = {safe_round(bp_test[3])}
-- White: estadístico = {white_result["stat"]}, p-valor = {white_result["p_value"]}
+- White: estadístico = {white_result}
 - VIFs: {vif_str}
 
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
