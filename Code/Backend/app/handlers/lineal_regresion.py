@@ -29,6 +29,7 @@ def ask_llm(prompt: str) -> str:
                 "num_ctx": 4096,
                 "stream": False
             },
+            timeout=4
         )
         r.raise_for_status()
         return r.json().get("response", "Respuesta vacía de IA")
@@ -117,6 +118,10 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
     try:
         # 0) cargar datos en DataFrame
         df_raw = pd.DataFrame(data, columns=columns)
+        MAX_ROWS = 1500  # Limitar rows de datos para que no cuelgue el back
+        if len(df_raw) > MAX_ROWS:
+            df_raw = df_raw.sample(MAX_ROWS, random_state=42)
+
         column_errors = {}         # detalles por columna (ejemplos/filas)
         meta = {
             "dropped_columns": [],   # columnas eliminadas automáticamente
@@ -134,7 +139,7 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         meta["warnings"].append(
             f"Columnas eliminadas por tipo: {', '.join(drop_cols)}"
         )
-        df = df_raw.drop(columns=drop_cols, errors="ignore").copy()
+        df = df_raw.drop(columns=drop_cols, errors="ignore")
 
         # 2) detectar columnas constantes resultantes y descartarlas
         constant_cols_after = [c for c in df.columns if df[c].nunique() <= 1]
@@ -181,15 +186,14 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         # 6) en los valores NaN colocar la media de la columna (imputación)
         for col in df.columns:
             if df[col].isna().any():
-                # calcular media sin NaN
-                df[col] = df[col].astype(float) # asegurar float para la media
                 mean_val = df[col].mean()
-                if np.isnan(mean_val):
-                    # si la media no se puede calcular (col vacía), se descartará más arriba
-                    continue
-                count_nan = int(df[col].isna().sum())
-                df[col].fillna(mean_val, inplace=True)
-                meta["imputed_columns"][col] = {"mean": float(mean_val), "count": count_nan}
+                if not np.isnan(mean_val):
+                    count_nan = int(df[col].isna().sum())
+                    df[col] = df[col].fillna(mean_val)
+                    meta["imputed_columns"][col] = {
+                        "mean": float(mean_val),
+                        "count": count_nan
+                    }
 
         # 7) validar que quedan filas y columnas suficientes
         meta["rows_after"] = len(df)
