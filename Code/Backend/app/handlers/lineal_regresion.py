@@ -67,7 +67,8 @@ def ask_llm(prompt: str) -> str | None:
             timeout=4
         )
         r.raise_for_status()
-        return r.json().get("response")
+        text = r.json().get("response")
+        return text.strip() if text and text.strip() else None
     except requests.RequestException:
         return None
 
@@ -351,14 +352,44 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
         # VIF
         vif = []
         for i, col in enumerate(X_const.columns):
-            if col == 'const':
+            if col == "const":
                 continue
-            vif_value = variance_inflation_factor(X_const.values, i)
-            vif.append({"variable": col, "VIF": float(vif_value)})
+            try:
+                v = variance_inflation_factor(X_const.values, i)
+                vif.append({
+                    "variable": col,
+                    "VIF": float(v) if np.isfinite(v) else None
+                })
+            except Exception:
+                vif.append({
+                    "variable": col,
+                    "VIF": None
+                })
 
         # Cook's distance y otros valores diagnósticos
+        if model.mse_resid is None or model.mse_resid <= 0 or np.isnan(model.mse_resid):
+            return {
+                "ok": False,
+                "error": "Varianza residual inválida (modelo degenerado)",
+                "meta": meta
+            }
+
         influence = model.get_influence()
         summary_frame = influence.summary_frame()
+
+        summary_frame["hat_diag"] = np.clip(
+            summary_frame["hat_diag"], 0, 0.999999
+        )
+        summary_frame["standard_resid"] = (
+            summary_frame["standard_resid"]
+            .replace([np.inf, -np.inf], np.nan)
+            .fillna(0)
+        )
+        summary_frame["cooks_d"] = (
+            summary_frame["cooks_d"]
+            .replace([np.inf, -np.inf], np.nan)
+            .fillna(0)
+        )
 
         results_table = pd.DataFrame({
             "id": df.index,
@@ -370,6 +401,9 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             "Cooks_distance": summary_frame["cooks_d"],
             "Outlier": np.abs(summary_frame["standard_resid"]) > 2
         })
+
+        results_table = results_table.replace([np.inf, -np.inf], np.nan)
+        results_table = results_table.fillna(0)
 
         # Conclusión global
         conclusion = (
@@ -427,9 +461,12 @@ Datos clave:
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
 """
 
-        ia_response = ask_llm(prompt_full_analysis) \
-            or ask_llm_external(prompt_full_analysis) \
+        ia_response = (
+            ask_llm(prompt_full_analysis)
+            or ask_llm_external(prompt_full_analysis)
             or "No se pudo generar respuesta de IA"
+        )
+
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
