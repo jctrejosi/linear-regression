@@ -375,7 +375,10 @@ Datos clave:
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
 """
 
-        ia_response = ask_llm(prompt_full_analysis)
+        try:
+            ia_response = ask_llm(prompt_full_analysis)
+        except Exception:
+            ia_response = "No se pudo generar respuesta de IA"
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
