@@ -16,6 +16,7 @@ import requests
 def ask_llm(prompt: str) -> str:
     ollama_url = os.getenv("OLLAMA_URL")
     if not ollama_url:
+        # Fallback seguro si la URL no está definida
         return "Servicio de IA no configurado"
 
     try:
@@ -30,7 +31,7 @@ def ask_llm(prompt: str) -> str:
             },
         )
         r.raise_for_status()
-        return r.json().get("response", None)
+        return r.json().get("response", "Respuesta vacía de IA")
     except requests.RequestException:
         return "No se pudo generar respuesta de IA"
 
