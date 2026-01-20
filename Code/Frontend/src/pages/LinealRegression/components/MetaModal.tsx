@@ -8,14 +8,17 @@ type Props = {
 };
 
 export const MetaModal = ({ meta, open, onClose }: Props) => {
-  if (!open || !meta) return null;
+  if (!meta) return null;
 
   const copyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(meta, null, 2));
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4
+      ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+    >
       <div className="bg-white w-full max-w-2xl rounded-xl shadow-lg overflow-hidden">
         {/* header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-100">

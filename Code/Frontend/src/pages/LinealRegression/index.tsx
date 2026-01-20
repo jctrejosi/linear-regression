@@ -49,7 +49,6 @@ export const LinealRegresion = ({ data }: props) => {
         dependent,
       });
       setResult(response);
-      setView(true);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const data = error.response?.data as {
@@ -74,6 +73,7 @@ export const LinealRegresion = ({ data }: props) => {
 
   useEffect(() => {
     if (!result?.ok) return;
+    if (result.ok) setView(true);
 
     if (result.meta) setShowMetaModal(true);
     if (result.ia_response) setShowIaModal(true);
