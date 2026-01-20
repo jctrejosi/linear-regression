@@ -15,6 +15,7 @@ import requests
 def ask_llm_external(prompt: str) -> str | None:
     groq_key = os.getenv("GROQ_API_KEY")
     if not groq_key:
+        print("[groq] api key no configurada")
         return None
 
     try:
@@ -26,14 +27,26 @@ def ask_llm_external(prompt: str) -> str | None:
             },
             json={
                 "model": "openai/gpt-oss-120b",
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ],
                 "temperature": 0.2,
             },
-            timeout=30
+            timeout=6
         )
+
+        print(f"[groq] status: {r.status_code}")
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
-    except Exception:
+
+        content = r.json()["choices"][0]["message"]["content"]
+        print(f"[groq] respuesta ok ({len(content)} chars)")
+        return content
+
+    except requests.HTTPError as e:
+        print(f"[groq] http error: {e} | body: {r.text[:400]}")
+        return None
+    except Exception as e:
+        print(f"[groq] error inesperado: {e}")
         return None
 
 def ask_llm(prompt: str) -> str | None:
