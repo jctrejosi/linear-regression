@@ -32,7 +32,7 @@ def ask_llm_external(prompt: str) -> str | None:
                 ],
                 "temperature": 0.2,
             },
-            timeout=6
+            timeout=30
         )
 
         print(f"[groq] status: {r.status_code}")
