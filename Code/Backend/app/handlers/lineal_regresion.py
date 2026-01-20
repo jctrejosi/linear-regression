@@ -1,4 +1,3 @@
-from flask import Blueprint
 from pandas.api.types import (
     is_numeric_dtype,
     is_bool_dtype
@@ -6,7 +5,6 @@ from pandas.api.types import (
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from dotenv import load_dotenv
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.diagnostic import het_breuschpagan, het_white
 from statsmodels.stats.stattools import durbin_watson, jarque_bera
@@ -15,21 +13,26 @@ import os
 import requests
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL")
-
 def ask_llm(prompt: str) -> str:
-    r = requests.post(
-        f"{OLLAMA_URL}/api/generate",
-        json={
-            "model": "qwen2.5:3b",
-            "prompt": prompt,
-            "temperature": 0.2,
-            "num_ctx": 4096,
-            "stream": False
-        },
-    )
-    r.raise_for_status()
-    return r.json()["response"]
+    ollama_url = os.getenv("OLLAMA_URL")
+    if not ollama_url:
+        return "Servicio de IA no configurado"
+
+    try:
+        r = requests.post(
+            f"{ollama_url}/api/generate",
+            json={
+                "model": "qwen2.5:3b",
+                "prompt": prompt,
+                "temperature": 0.2,
+                "num_ctx": 4096,
+                "stream": False
+            },
+        )
+        r.raise_for_status()
+        return r.json().get("response", None)
+    except requests.RequestException:
+        return "No se pudo generar respuesta de IA"
 
 def safe_round(value):
     return round(value, 2) if value is not None else None
