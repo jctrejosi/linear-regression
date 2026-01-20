@@ -1,3 +1,4 @@
+import math
 from flask import Blueprint, request, jsonify
 from .handlers.file_converter import file_converter
 from .handlers.lineal_regresion import run_regression
@@ -19,6 +20,21 @@ def converter_file():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def clean_nan_values(obj):
+    """Reemplaza NaN, Infinity y -Infinity por None o valores válidos"""
+    if isinstance(obj, float):
+        if math.isnan(obj):
+            return None
+        if math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: clean_nan_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_nan_values(item) for item in obj]
+    else:
+        return obj
+
 @bp.route('/api/v1.0/regression', methods=['POST'])
 def lineal_regression():
     payload = request.get_json()
@@ -27,7 +43,9 @@ def lineal_regression():
         return jsonify({"ok": False, "error": "Debe enviar 'data', 'columns' y 'dependent' en la petición"}), 400
 
     result = run_regression(payload['data'], payload['columns'], payload['dependent'])
-    return jsonify(result), 200 if result.get("ok") else 400
+    cleaned_result = clean_nan_values(result)
+
+    return jsonify(cleaned_result), 200 if result.get("ok") else 400
 
 @bp.route('/health', methods=['GET'])
 def health():
