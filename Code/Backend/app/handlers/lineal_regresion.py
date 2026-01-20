@@ -12,10 +12,10 @@ from scipy.stats import shapiro, kstest
 import os
 import requests
 
-def ask_llm_external(prompt: str) -> str:
+def ask_llm_external(prompt: str) -> str | None:
     groq_key = os.getenv("GROQ_API_KEY")
     if not groq_key:
-        return "Servicio de IA externo no configurado"
+        return None
 
     try:
         r = requests.post(
@@ -25,25 +25,21 @@ def ask_llm_external(prompt: str) -> str:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "mixtral-8x7b-32768",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
+                "model": "openai/gpt-oss-120b",
+                "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2,
             },
-            timeout=6
+            timeout=30
         )
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"]
     except Exception:
-        return "No se pudo generar respuesta con IA externa"
+        return None
 
-
-def ask_llm(prompt: str) -> str:
+def ask_llm(prompt: str) -> str | None:
     ollama_url = os.getenv("OLLAMA_URL")
     if not ollama_url:
-        # Fallback seguro si la URL no está definida
-        return "Servicio de IA no configurado"
+        return None
 
     try:
         r = requests.post(
@@ -58,9 +54,9 @@ def ask_llm(prompt: str) -> str:
             timeout=4
         )
         r.raise_for_status()
-        return r.json().get("response", "Respuesta vacía de IA")
+        return r.json().get("response")
     except requests.RequestException:
-        return "No se pudo generar respuesta de IA"
+        return None
 
 def safe_round(value):
     return round(value, 2) if value is not None else None
@@ -418,10 +414,9 @@ Datos clave:
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
 """
 
-        ia_response = ask_llm(prompt_full_analysis)
-
-        if ia_response.startswith("No se pudo") or ia_response.startswith("Servicio de IA"):
-            ia_response = ask_llm_external(prompt_full_analysis)
+        ia_response = ask_llm(prompt_full_analysis) \
+            or ask_llm_external(prompt_full_analysis) \
+            or "No se pudo generar respuesta de IA"
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
