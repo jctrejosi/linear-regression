@@ -18,7 +18,7 @@ type props = {
 export const LinealRegresion = ({ data }: props) => {
   const [view, setView] = useState<boolean>(false);
   const [result, setResult] = useState<RegressionResponse>(
-    {} as RegressionResponse
+    {} as RegressionResponse,
   );
   const [dependent, setDependent] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -48,12 +48,8 @@ export const LinealRegresion = ({ data }: props) => {
         data: data.data,
         dependent,
       });
-      if (response.meta) {
-        setShowMetaModal(true);
-      }
       setResult(response);
       setView(true);
-      if (response.ia_response) setShowIaModal(true);
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const data = error.response?.data as {
@@ -75,6 +71,13 @@ export const LinealRegresion = ({ data }: props) => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!result?.ok) return;
+
+    if (result.meta) setShowMetaModal(true);
+    if (result.ia_response) setShowIaModal(true);
+  }, [result]);
 
   const closeModal = () => setView(false);
 
