@@ -25,6 +25,9 @@ export const LinealRegresion = ({ data }: props) => {
   const [showMetaModal, setShowMetaModal] = useState(false);
   const [showIaModal, setShowIaModal] = useState(false);
 
+  const fmt = (v?: number) =>
+    v !== undefined && Number.isFinite(v) ? v.toFixed(4) : "—";
+
   // Inicializar dependent con la primera columna disponible
   useEffect(() => {
     if (data?.columns && data.columns.length > 0) {
@@ -873,38 +876,47 @@ export const LinealRegresion = ({ data }: props) => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {result.results_table?.map((row, index) => (
-                    <tr key={index} className="hover:bg-gray-50 transition">
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.id}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Y_observado.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Y_predicho.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Residuo.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Residuo_estandarizado.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Leverage.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-700">
-                        {row.Cooks_distance.toFixed(4)}
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-sm font-semibold ${
-                          row.Outlier ? "text-red-500" : "text-gray-700"
-                        }`}
-                      >
-                        {row.Outlier ? "Sí" : "No"}
-                      </td>
-                    </tr>
-                  ))}
+                  {result.results_table?.map((row, index) => {
+                    return (
+                      <tr key={index} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {row.id}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Y_observado)}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Y_predicho)}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Residuo)}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Residuo_estandarizado)}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Leverage)}
+                        </td>
+
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {fmt(row.Cooks_distance)}
+                        </td>
+
+                        <td
+                          className={`px-4 py-2 text-sm font-semibold ${
+                            row.Outlier ? "text-red-500" : "text-gray-700"
+                          }`}
+                        >
+                          {row.Outlier ? "Sí" : "No"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
