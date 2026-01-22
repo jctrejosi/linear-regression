@@ -64,7 +64,7 @@ export const MetaModal = ({ meta, open, onClose }: Props) => {
           {/* columnas descartadas */}
           <div>
             <p className="text-sm font-medium text-gray-600">
-              Columnas eliminadas
+              Las siguientes columnas no se tomaron en cuenta para el análisis
             </p>
             {meta.dropped_columns && meta.dropped_columns.length > 0 ? (
               <ul className="list-disc ml-5 mt-2 text-sm">
@@ -75,9 +75,7 @@ export const MetaModal = ({ meta, open, onClose }: Props) => {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-gray-500 mt-1">
-                No se eliminaron columnas.
-              </p>
+              <p className="text-sm text-gray-500 mt-1">-</p>
             )}
           </div>
 

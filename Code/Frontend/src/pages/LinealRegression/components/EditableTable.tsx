@@ -27,6 +27,19 @@ export const EditableTable = ({
     setData({ columns, data: updated });
   };
 
+  const handleColumnNameChange = (colIndex: number, value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    if (columns.some((c, i) => c === trimmed && i !== colIndex)) {
+      return;
+    }
+
+    const newColumns = [...columns];
+    newColumns[colIndex] = trimmed;
+    setData({ columns: newColumns, data });
+  };
+
   const addRow = () => {
     if (columns.length === 0) {
       alert("Por favor, añade al menos una columna antes de añadir filas.");
@@ -79,7 +92,12 @@ export const EditableTable = ({
       <div className="flex flex-col gap-4">
         <button
           onClick={addRow}
-          className="flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2 rounded hover:bg-gray-600 transition font-semibold w-full sm:w-auto"
+          className="
+    flex items-center justify-center gap-2
+    bg-gray-900 text-white px-5 py-2 rounded
+    hover:bg-gray-600 transition font-semibold
+    w-full sm:w-fit
+  "
         >
           <AiOutlineInsertRowBelow /> Añadir fila
         </button>
@@ -89,12 +107,24 @@ export const EditableTable = ({
             type="text"
             placeholder="Nombre de la columna"
             ref={columnName}
-            className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="
+      w-full
+      sm:w-64
+      border border-gray-300 rounded
+      px-4 py-2
+      focus:outline-none focus:ring-2 focus:ring-blue-400
+    "
           />
 
           <button
             onClick={addColumn}
-            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-600 transition font-semibold w-full sm:w-auto whitespace-nowrap"
+            className="
+      flex items-center justify-center gap-2
+      bg-gray-900 text-white
+      px-4 py-2 rounded
+      hover:bg-gray-600 transition font-semibold
+      w-full sm:w-auto whitespace-nowrap
+    "
           >
             <AiOutlineInsertRowRight /> Añadir columna
           </button>
@@ -114,8 +144,15 @@ export const EditableTable = ({
                   key={i}
                   className="px-3 py-2 text-left text-sm font-medium text-gray-700"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span>{col}</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={col}
+                      onChange={(e) =>
+                        handleColumnNameChange(i, e.target.value)
+                      }
+                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
                     <button
                       onClick={() => deleteColumn(i)}
                       className="text-red-500 hover:text-red-700 shrink-0"

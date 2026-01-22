@@ -87,16 +87,20 @@ export const LinealRegresion = ({ data }: props) => {
   return (
     <div>
       {/* Botón + select */}
-      <div className="flex flex-col sm:flex-row items-start gap-4">
-        <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={handleSend}
             disabled={loading}
-            className={`px-5 py-2 rounded text-white font-semibold transition w-[15rem] ${
-              loading
-                ? "bg-blue-300 animate-pulse cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-600"
-            }`}
+            className={`
+        px-5 py-2 rounded text-white font-semibold transition
+        w-full sm:w-[15rem]
+        ${
+          loading
+            ? "bg-blue-300 animate-pulse cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-700"
+        }
+      `}
           >
             {loading ? "Ejecutando..." : "Ejecutar regresión lineal"}
           </button>
@@ -104,18 +108,25 @@ export const LinealRegresion = ({ data }: props) => {
           {result.ok && (
             <button
               onClick={() => setView(true)}
-              className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded transition text-gray-700 flex items-center gap-1"
+              className="
+          bg-gray-200 hover:bg-gray-300
+          px-3 py-2 rounded transition text-gray-700
+          flex items-center justify-center gap-1
+          w-full sm:w-auto
+        "
               title="Ver último resultado"
             >
               <FaEye /> Resultado anterior
             </button>
           )}
         </div>
-        <label className="flex flex-col text-sm text-gray-500 underline font-bold">
+
+        <label className="flex flex-col text-sm text-gray-500 underline font-bold w-full sm:w-auto">
+          Variable dependiente
           <select
             value={dependent}
             onChange={(e) => setDependent(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-2 text-sm"
+            className="border border-gray-300 rounded px-2 py-2 text-sm mt-1 w-full"
           >
             {data?.columns.map((col) => (
               <option key={col} value={col}>
@@ -123,7 +134,6 @@ export const LinealRegresion = ({ data }: props) => {
               </option>
             ))}
           </select>
-          Variable dependiente
         </label>
       </div>
 

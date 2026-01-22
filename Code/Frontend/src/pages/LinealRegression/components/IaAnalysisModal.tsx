@@ -32,8 +32,36 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
         </div>
 
         {/* body */}
-        <div className="px-6 py-4 overflow-y-auto prose max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <div
+          className="
+    px-4 sm:px-6 py-4
+    overflow-y-auto overflow-x-hidden
+    prose max-w-none
+    break-words
+  "
+        >
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table({ children }) {
+                return (
+                  <div className="overflow-x-auto">
+                    <table>{children}</table>
+                  </div>
+                );
+              },
+
+              pre({ children }) {
+                return <pre className="overflow-x-auto">{children}</pre>;
+              },
+
+              code({ children }) {
+                return <code className="break-all">{children}</code>;
+              },
+            }}
+          >
+            {content}
+          </ReactMarkdown>
         </div>
       </div>
     </div>
