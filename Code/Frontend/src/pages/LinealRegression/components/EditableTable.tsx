@@ -20,7 +20,7 @@ export const EditableTable = ({
   const handleCellChange = (
     rowIndex: number,
     colIndex: number,
-    value: string | number
+    value: string | number,
   ) => {
     const updated = [...data];
     updated[rowIndex][colIndex] = value;
@@ -54,7 +54,7 @@ export const EditableTable = ({
 
   const deleteColumn = (colIndex: number) => {
     const confirmDelete = confirm(
-      `¿Seguro que deseas eliminar la columna "${columns[colIndex]}"?`
+      `¿Seguro que deseas eliminar la columna "${columns[colIndex]}"?`,
     );
     if (!confirmDelete) return;
 
@@ -65,7 +65,7 @@ export const EditableTable = ({
 
   const deleteRow = (rowIndex: number) => {
     const confirmDelete = confirm(
-      `¿Seguro que deseas eliminar la fila ${rowIndex + 1}?`
+      `¿Seguro que deseas eliminar la fila ${rowIndex + 1}?`,
     );
     if (!confirmDelete) return;
 
@@ -76,24 +76,25 @@ export const EditableTable = ({
   return (
     <div className="p-6 bg-white shadow-md rounded-lg space-y-6">
       {/* Controles */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex flex-col gap-4">
         <button
           onClick={addRow}
-          className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2 rounded hover:bg-gray-600 transition font-semibold"
+          className="flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-2 rounded hover:bg-gray-600 transition font-semibold w-full sm:w-auto"
         >
           <AiOutlineInsertRowBelow /> Añadir fila
         </button>
 
-        <div className="flex items-center mt-2 sm:mt-0">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <input
             type="text"
             placeholder="Nombre de la columna"
             ref={columnName}
-            className="border border-gray-300 rounded-l px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
+
           <button
             onClick={addColumn}
-            className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2 rounded-r hover:bg-gray-600 transition font-semibold"
+            className="flex items-center justify-center gap-2 bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-600 transition font-semibold w-full sm:w-auto whitespace-nowrap"
           >
             <AiOutlineInsertRowRight /> Añadir columna
           </button>
@@ -113,11 +114,11 @@ export const EditableTable = ({
                   key={i}
                   className="px-3 py-2 text-left text-sm font-medium text-gray-700"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span>{col}</span>
                     <button
                       onClick={() => deleteColumn(i)}
-                      className="text-red-500 hover:text-red-700"
+                      className="text-red-500 hover:text-red-700 shrink-0"
                       title={`Eliminar columna "${col}"`}
                     >
                       <FiTrash2 />
@@ -125,15 +126,16 @@ export const EditableTable = ({
                   </div>
                 </th>
               ))}
-              <th></th>
+              <th />
             </tr>
           </thead>
+
           <tbody className="bg-white divide-y divide-gray-200">
             {data.map((row, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-gray-50 transition">
                 <td className="px-3 py-2 text-sm text-gray-700">{rowIndex}</td>
                 {row.map((cell, colIndex) => (
-                  <td key={colIndex} className="px-2 py-1">
+                  <td key={colIndex} className="px-2 py-1 min-w-[120px]">
                     <input
                       type="text"
                       value={cell ?? ""}

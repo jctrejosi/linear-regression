@@ -164,17 +164,21 @@ export const LinealRegresion = ({ data }: props) => {
             </div>
 
             {/* Título y botones para ver información adicional */}
-            <div className="flex items-center gap-4 mb-6">
-              <h1 className="text-2xl font-semibold">
+            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
+              <h1 className="text-2xl font-semibold md:mr-4">
                 Resultados de la regresión lineal
               </h1>
 
               {/* Botón para ver el filtrado de los datos */}
               <button
                 onClick={() => setShowMetaModal(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm
-                text-yellow-700 bg-yellow-50 border border-yellow-200
-                rounded hover:bg-yellow-100"
+                className="
+      flex items-center justify-center gap-2
+      px-3 py-2 text-sm
+      text-yellow-700 bg-yellow-50 border border-yellow-200
+      rounded hover:bg-yellow-100
+      w-full md:w-auto
+    "
                 title="ver informe de limpieza de datos"
               >
                 <FiFilter size={18} />
@@ -183,27 +187,18 @@ export const LinealRegresion = ({ data }: props) => {
 
               <button
                 onClick={() => setShowIaModal(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm
-                text-blue-700 bg-blue-50 border border-blue-200
-                rounded hover:bg-blue-100"
+                className="
+      flex items-center justify-center gap-2
+      px-3 py-2 text-sm
+      text-blue-700 bg-blue-50 border border-blue-200
+      rounded hover:bg-blue-100
+      w-full md:w-auto
+    "
                 title="ver interpretación de resultados"
               >
                 <HiOutlineDocumentReport size={18} />
                 Explicación de resultados
               </button>
-
-              {/* Botón para descargar un pdf de los datos
-              <button
-                onClick={printModal}
-                className="flex items-center gap-2 px-3 py-2 text-sm
-                text-blue-700 bg-blue-50 border border-blue-200
-                rounded hover:bg-blue-100"
-                title="ver informe de limpieza de datos"
-              >
-                <HiDocumentDownload size={18} />
-                Descargar / Imprimir PDF
-              </button>
-              */}
             </div>
 
             {/* ecuación del modelo */}
