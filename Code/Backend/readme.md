@@ -32,6 +32,9 @@ python -m pip install -r requirements.txt
 
 ```
 MODEL_PATH=C:\Users\jk\UN\statistics-2\Code\models\qwen2.5-3b-instruct-q4_k_m.gguf
+OLLAMA_URL=http://localhost:1143
+GROQ_API_KEY='your_api_key'
+LLM_EXTERNAL=false
 ```
 
 ## Correr el proyecto

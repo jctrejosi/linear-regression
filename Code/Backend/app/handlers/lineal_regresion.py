@@ -461,12 +461,10 @@ Datos clave:
 La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos, y no uses tablas para explicar.
 """
 
-        ia_response = (
-            ask_llm(prompt_full_analysis)
-            or ask_llm_external(prompt_full_analysis)
-            or "No se pudo generar respuesta de IA"
-        )
-
+        if os.getenv("LLM_EXTERNAL") == "true":
+            ia_response = ask_llm_external(prompt_full_analysis)
+        else:
+            ia_response = ask_llm(prompt_full_analysis) or ask_llm_external(prompt_full_analysis)
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
