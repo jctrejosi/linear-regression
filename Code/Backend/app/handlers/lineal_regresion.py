@@ -458,7 +458,7 @@ Datos clave:
 - White: estadístico = {white_result}
 - VIFs: {vif_str}
 
-La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos
+La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos, y no uses tablas para explicar.
 """
 
         ia_response = (
