@@ -88,9 +88,10 @@ export const LinealRegresion = ({ data }: props) => {
         console.error("error consultando IA", err);
         setIaResult("Error generando la explicación. Intenta nuevamente.");
       }
-
-      if (result.meta) setShowMetaModal(true);
     }
+
+    if (result.meta) setShowMetaModal(true);
+    setShowIaModal(true);
 
     fetchIaResult();
   }, [result]);

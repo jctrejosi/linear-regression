@@ -78,12 +78,12 @@ def ask_llm_groq(prompt: str) -> str | None:
         return None
 
 def ask_llm(prompt: str) -> str | None:
-    ollama_url = os.getenv("OLLAMA_URL")
-    if not ollama_url:
+    local_url = os.getenv("LLM_LOCAL")
+    if not local_url:
         return None
 
     r = requests.post(
-        f"{ollama_url}/api/generate",
+        f"{local_url}/api/generate",
         json={
             "model": "qwen2.5:3b",
             "prompt": prompt,
@@ -160,16 +160,16 @@ def llm_handler(result: dict) -> str:
     try:
         if os.getenv("LLM_UN") == "true":
             response = ask_llm_un(prompt)
-            return response or "no se encontró ningún modelo"
+            return response or "[un] no se encontró ningún modelo"
 
         if os.getenv("LLM_GROQ") == "true":
             response = ask_llm_groq(prompt)
-            return response or "no se encontró ningún modelo"
+            return response or "[groq] no se encontró ningún modelo"
 
         response = ask_llm(prompt)
-        return response or "no se encontró ningún modelo"
+        return response or "[local] no se encontró ningún modelo"
 
     except requests.RequestException as e:
         print("[llm] error:", e)
-        return "no se encontró ningún modelo"
+        return "[error] no se encontró ningún modelo"
 

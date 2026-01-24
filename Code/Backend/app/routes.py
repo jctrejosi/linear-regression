@@ -49,6 +49,8 @@ def lineal_regression():
 
     return jsonify(cleaned_result), 200 if result.get("ok") else 400
 
+import json
+
 @bp.route("/api/v1.0/llm", methods=["POST"])
 def llm_explain():
     payload = request.get_json()
@@ -57,12 +59,19 @@ def llm_explain():
         return jsonify({"ok": False, "error": "result requerido"}), 400
 
     response = llm_handler(payload["result"])
-    print("LLM response:", response)
 
     if not response:
         return jsonify({"ok": False, "error": "falló el modelo"}), 500
 
-    return jsonify({"ok": True, "response": response}), 200
+    # decodificar caracteres unicode y escapes de saltos de línea
+    try:
+        # esto convierte "\u2013" en "–", "\n" en salto real, etc.
+        response_clean = json.loads(f'"{response}"').replace("\\n", "\n")
+    except Exception:
+        # si falla, devolvemos el original
+        response_clean = response
+
+    return jsonify({"ok": True, "response": response_clean}), 200
 
 
 @bp.route('/health', methods=['GET'])

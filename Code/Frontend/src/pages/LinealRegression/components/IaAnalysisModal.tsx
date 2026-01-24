@@ -34,12 +34,10 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
         {/* body */}
         <div
           className="
-            px-4 sm:px-6 py-6
-            overflow-y-auto overflow-x-hidden
-            prose max-w-none
-            break-words
-            flex items-center justify-center
-          "
+    px-4 sm:px-6 py-6
+    overflow-y-auto
+    prose max-w-full
+  "
         >
           {content === null ? (
             <div className="flex flex-col items-center gap-3 text-gray-500 w-full">
@@ -54,8 +52,8 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
               components={{
                 table({ children }) {
                   return (
-                    <div className="overflow-x-auto">
-                      <table>{children}</table>
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full">{children}</table>
                     </div>
                   );
                 },
@@ -63,7 +61,7 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
                   return <pre className="overflow-x-auto">{children}</pre>;
                 },
                 code({ children }) {
-                  return <code className="break-all">{children}</code>;
+                  return <code className="break-words">{children}</code>;
                 },
               }}
             >
