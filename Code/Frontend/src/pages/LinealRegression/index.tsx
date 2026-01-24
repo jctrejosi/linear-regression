@@ -10,6 +10,7 @@ import { AnovaResultsTable } from "./components/AnovaResultsTable";
 import { set_regression } from "./services/lineal_regression";
 import { IaAnalysisModal } from "./components/IaAnalysisModal";
 import { HiOutlineDocumentReport } from "react-icons/hi";
+import { query_llm } from "./services/query_llm";
 
 type props = {
   data: TableFile | undefined;
@@ -24,6 +25,7 @@ export const LinealRegresion = ({ data }: props) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [showMetaModal, setShowMetaModal] = useState(false);
   const [showIaModal, setShowIaModal] = useState(false);
+  const [iaResult, setIaResult] = useState<null | string>(null);
 
   const fmt = (v?: number) =>
     v !== undefined && Number.isFinite(v) ? v.toFixed(4) : "—";
@@ -75,11 +77,22 @@ export const LinealRegresion = ({ data }: props) => {
   };
 
   useEffect(() => {
-    if (!result?.ok) return;
-    if (result.ok) setView(true);
+    async function fetchIaResult() {
+      if (!result?.ok) return;
+      setView(true);
 
-    if (result.meta) setShowMetaModal(true);
-    if (result.ia_response) setShowIaModal(true);
+      try {
+        const ia_consult = await query_llm(result);
+        setIaResult(ia_consult);
+      } catch (err) {
+        console.error("error consultando IA", err);
+        setIaResult("Error generando la explicación. Intenta nuevamente.");
+      }
+
+      if (result.meta) setShowMetaModal(true);
+    }
+
+    fetchIaResult();
   }, [result]);
 
   const closeModal = () => setView(false);
@@ -157,7 +170,7 @@ export const LinealRegresion = ({ data }: props) => {
           <IaAnalysisModal
             open={showIaModal}
             onClose={() => setShowIaModal(false)}
-            content={result.ia_response}
+            content={iaResult}
           />
           <div
             id="result-text"

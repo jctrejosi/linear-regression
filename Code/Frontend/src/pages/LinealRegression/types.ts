@@ -95,5 +95,4 @@ export type RegressionResponse = {
     Cooks_distance: number;
     Outlier: boolean;
   }[];
-  ia_response: string;
 };

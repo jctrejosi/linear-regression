@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { TableFile } from "./@types";
 import { LinealRegresion } from "./pages/LinealRegression";
 import { AiOutlinePaperClip } from "react-icons/ai";
-import axios from "axios";
+import { convert_file } from "./pages/LinealRegression/services/convert_file";
 
 export const App = () => {
   const [dataTable, setDataTable] = useState<TableFile | undefined>(undefined);
@@ -23,13 +23,8 @@ export const App = () => {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await axios.post<TableFile>(
-        "api/v1.0/converter_file",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } },
-      );
-
-      setDataTable(response.data);
+      const table = await convert_file(file);
+      setDataTable(table);
     } catch (err) {
       console.error(err);
       alert("Error cargando archivo de ejemplo");

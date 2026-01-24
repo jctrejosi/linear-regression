@@ -1,5 +1,7 @@
 import math
 from flask import Blueprint, request, jsonify
+
+from .handlers.consult_model import llm_handler
 from .handlers.file_converter import file_converter
 from .handlers.lineal_regresion import run_regression
 
@@ -46,6 +48,22 @@ def lineal_regression():
     cleaned_result = clean_nan_values(result)
 
     return jsonify(cleaned_result), 200 if result.get("ok") else 400
+
+@bp.route("/api/v1.0/llm", methods=["POST"])
+def llm_explain():
+    payload = request.get_json()
+
+    if not payload or "result" not in payload:
+        return jsonify({"ok": False, "error": "result requerido"}), 400
+
+    response = llm_handler(payload["result"])
+    print("LLM response:", response)
+
+    if not response:
+        return jsonify({"ok": False, "error": "falló el modelo"}), 500
+
+    return jsonify({"ok": True, "response": response}), 200
+
 
 @bp.route('/health', methods=['GET'])
 def health():

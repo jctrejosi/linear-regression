@@ -9,68 +9,6 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.diagnostic import het_breuschpagan, het_white
 from statsmodels.stats.stattools import durbin_watson, jarque_bera
 from scipy.stats import shapiro, kstest
-import os
-import requests
-
-def ask_llm_external(prompt: str) -> str | None:
-    groq_key = os.getenv("GROQ_API_KEY")
-    if not groq_key:
-        print("[groq] api key no configurada")
-        return None
-
-    try:
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {groq_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "openai/gpt-oss-120b",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.2,
-            },
-            timeout=30
-        )
-
-        print(f"[groq] status: {r.status_code}")
-        r.raise_for_status()
-
-        content = r.json()["choices"][0]["message"]["content"]
-        print(f"[groq] respuesta ok ({len(content)} chars)")
-        return content
-
-    except requests.HTTPError as e:
-        print(f"[groq] http error: {e} | body: {r.text[:400]}")
-        return None
-    except Exception as e:
-        print(f"[groq] error inesperado: {e}")
-        return None
-
-def ask_llm(prompt: str) -> str | None:
-    ollama_url = os.getenv("OLLAMA_URL")
-    if not ollama_url:
-        return None
-
-    try:
-        r = requests.post(
-            f"{ollama_url}/api/generate",
-            json={
-                "model": "qwen2.5:3b",
-                "prompt": prompt,
-                "temperature": 0.2,
-                "num_ctx": 4096,
-                "stream": False
-            },
-            timeout=4
-        )
-        r.raise_for_status()
-        text = r.json().get("response")
-        return text.strip() if text and text.strip() else None
-    except requests.RequestException:
-        return None
 
 def safe_round(value):
     return round(value, 2) if value is not None else None
@@ -426,45 +364,6 @@ def run_regression(data: list, columns: list, dependent: str, alpha: float = 0.0
             }
             for var, coef in coefficients.items()
         ]
-        vif_str = "\n".join([
-            f"{v['variable']}\t{v['VIF']}"
-            for v in vif
-        ])
-
-        prompt_full_analysis = f"""
-Necesito explicar los resultados de un modelo de regresión lineal múltiple, de manera detallada y con ejemplos, te voy a dar los datos
-
-Datos clave:
-- Observaciones usadas: {int(model.nobs)}
-- Variable dependiente: {dependent_col}
-- Variables independientes: {df.columns}
-- R²: {r2}
-- R² ajustado: {r2_adj}
-- Estadístico F del modelo: {model.fvalue}
-- Valor p del modelo: {f_pvalue}
-- SSR (suma de cuadrados de la regresión): {ss_regression}
-- SSE (suma de cuadrados del error): {ss_error}
-- MSR: {ms_regression}
-- MSE: {ms_error}
-- Estadístico F: {f_stat}
-- Coeficientes: {coefs_str}
-- Shapiro-Wilk p: {safe_round(sw_p)}
-- Kolmogorov-Smirnov p: {safe_round(ks_p)}
-- Jarque-Bera p: {safe_round(jb_p)}
-- Skewness: {safe_round(jb_skew)}
-- Kurtosis: {safe_round(jb_kurt)}
-- Durbin-Watson: {safe_round(dw)}
-- Breusch-Pagan: LM p = {safe_round(bp_test[1])}, F p = {safe_round(bp_test[3])}
-- White: estadístico = {white_result}
-- VIFs: {vif_str}
-
-La respuesta debe ser a modo de informe con la interpretación de cada dato importante, separa los párrafos y los títulos, y no uses tablas para explicar.
-"""
-
-        if os.getenv("LLM_EXTERNAL") == "true":
-            ia_response = ask_llm_external(prompt_full_analysis)
-        else:
-            ia_response = ask_llm(prompt_full_analysis) or ask_llm_external(prompt_full_analysis)
 
         conclusion = (
             "Se rechaza H0: el modelo es globalmente significativo"
@@ -535,10 +434,6 @@ La respuesta debe ser a modo de informe con la interpretación de cada dato impo
             "vif": vif,
             "conclusion": conclusion,
             "results_table": results_table.round(4).to_dict(orient="records"),
-
-            # respuestas de la IA
-
-            "ia_response": ia_response,
         }
 
 

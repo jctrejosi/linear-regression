@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 interface IaModalProps {
   open: boolean;
   onClose: () => void;
-  content: string;
+  content: string | null;
 }
 
 export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
@@ -34,34 +34,42 @@ export const IaAnalysisModal = ({ open, onClose, content }: IaModalProps) => {
         {/* body */}
         <div
           className="
-    px-4 sm:px-6 py-4
-    overflow-y-auto overflow-x-hidden
-    prose max-w-none
-    break-words
-  "
+            px-4 sm:px-6 py-6
+            overflow-y-auto overflow-x-hidden
+            prose max-w-none
+            break-words
+            flex items-center justify-center
+          "
         >
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              table({ children }) {
-                return (
-                  <div className="overflow-x-auto">
-                    <table>{children}</table>
-                  </div>
-                );
-              },
-
-              pre({ children }) {
-                return <pre className="overflow-x-auto">{children}</pre>;
-              },
-
-              code({ children }) {
-                return <code className="break-all">{children}</code>;
-              },
-            }}
-          >
-            {content}
-          </ReactMarkdown>
+          {content === null ? (
+            <div className="flex flex-col items-center gap-3 text-gray-500 w-full">
+              <div className="relative h-1 w-48 overflow-hidden rounded bg-gray-200">
+                <div className="absolute inset-y-0 w-1/3 bg-gray-500 animate-loading-bar" />
+              </div>
+              <span className="text-sm">Generando explicación…</span>
+            </div>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table({ children }) {
+                  return (
+                    <div className="overflow-x-auto">
+                      <table>{children}</table>
+                    </div>
+                  );
+                },
+                pre({ children }) {
+                  return <pre className="overflow-x-auto">{children}</pre>;
+                },
+                code({ children }) {
+                  return <code className="break-all">{children}</code>;
+                },
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          )}
         </div>
       </div>
     </div>
