@@ -157,7 +157,7 @@ def llm_handler(result: dict) -> str:
             response = ask_llm_un(prompt)
             return response or "no se encontró ningún modelo"
 
-        if os.getenv("LLM_EXTERNAL") == "true":
+        if os.getenv("LLM_GROQ") == "true":
             response = ask_llm_groq(prompt)
             return response or "no se encontró ningún modelo"
 
