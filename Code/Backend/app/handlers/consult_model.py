@@ -12,6 +12,11 @@ def ask_llm_un(prompt: str) -> str | None:
     try:
         r = requests.post(
             f"{un_url}/api/generate",
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "python-backend",
+                "ngrok-skip-browser-warning": "true",
+            },
             json={
                 "model": "deepseek-r1:8b",
                 "prompt": prompt,
