@@ -3,8 +3,39 @@ import requests
 
 MAX_PROMPT_CHARS = 12_000
 
+def ask_llm_un(prompt: str) -> str | None:
+    un_url = os.getenv("LLM_UN_URL")
+    if not un_url:
+        print("[llm_un] url no configurada")
+        return None
 
-def ask_llm_external(prompt: str) -> str | None:
+    try:
+        r = requests.post(
+            f"{un_url}/api/generate",
+            json={
+                "model": "deepseek-r1:8b",
+                "prompt": prompt,
+                "temperature": 0.2,
+                "num_ctx": 4096,
+                "stream": False,
+            },
+            timeout=30,
+        )
+
+        print(f"[llm_un] status: {r.status_code}")
+        r.raise_for_status()
+
+        text = r.json().get("response")
+        return text.strip() if text else None
+
+    except requests.HTTPError as e:
+        print(f"[llm_un] http error: {e} | body: {r.text[:400]}")
+        return None
+    except Exception as e:
+        print(f"[llm_un] error inesperado: {e}")
+        return None
+
+def ask_llm_groq(prompt: str) -> str | None:
     groq_key = os.getenv("GROQ_API_KEY")
     if not groq_key:
         print("[groq] api key no configurada")
@@ -12,7 +43,7 @@ def ask_llm_external(prompt: str) -> str | None:
 
     try:
         r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
+            os.getenv("LLM_GROQ_URL"),
             headers={
                 "Authorization": f"Bearer {groq_key}",
                 "Content-Type": "application/json",
@@ -112,25 +143,28 @@ La respuesta debe ser a modo de informe con la interpretación de cada dato impo
 Separa los párrafos y los títulos, y no uses tablas para explicar.
 """
 
-def llm_handler(result: dict) -> str | None:
+def llm_handler(result: dict) -> str:
     if not isinstance(result, dict):
-        return None
-
-    print("OLLAMA_URL =", os.getenv("OLLAMA_URL"))
-    print("LLM_EXTERNAL =", os.getenv("LLM_EXTERNAL"))
-    print("GROQ_API_KEY exists =", bool(os.getenv("GROQ_API_KEY")))
+        return "no se encontró ningún modelo"
 
     prompt = build_regression_prompt(result)
 
     if len(prompt) > MAX_PROMPT_CHARS:
-        return None
+        return "no se encontró ningún modelo"
 
     try:
-        if os.getenv("LLM_EXTERNAL") == "true":
-            return ask_llm_external(prompt)
+        if os.getenv("LLM_UN") == "true":
+            response = ask_llm_un(prompt)
+            return response or "no se encontró ningún modelo"
 
-        return ask_llm(prompt) or ask_llm_external(prompt)
+        if os.getenv("LLM_EXTERNAL") == "true":
+            response = ask_llm_groq(prompt)
+            return response or "no se encontró ningún modelo"
+
+        response = ask_llm(prompt)
+        return response or "no se encontró ningún modelo"
 
     except requests.RequestException as e:
-        print("LLM error:", e)
-        return None
+        print("[llm] error:", e)
+        return "no se encontró ningún modelo"
+
