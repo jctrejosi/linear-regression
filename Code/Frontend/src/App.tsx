@@ -3,13 +3,13 @@ import { FileUpload } from "@/pages/LinealRegression/components/FileUpload";
 import { useEffect, useState } from "react";
 import type { TableFile } from "./@types";
 import { LinealRegresion } from "./pages/LinealRegression";
-import { AiOutlinePaperClip } from "react-icons/ai";
+import { AiFillGithub, AiOutlinePaperClip } from "react-icons/ai";
 import { convert_file } from "./pages/LinealRegression/services/convert_file";
 
 export const App = () => {
   const [dataTable, setDataTable] = useState<TableFile | undefined>(undefined);
   const [dataEditable, setDataEditable] = useState<TableFile | undefined>(
-    undefined,
+    undefined
   );
 
   const loadSample = async (path: string, filename: string) => {
@@ -52,13 +52,28 @@ export const App = () => {
         lg:absolute lg:top-4 lg:right-4
       "
         >
+          <a
+            href="https://github.com/tu_usuario/tu_repo"
+            target="_blank"
+            rel="noopener"
+            className="
+        flex items-center gap-1
+        text-white underline text-xs
+        bg-gray-800 hover:bg-gray-700
+        px-2 py-1 rounded
+      "
+            aria-label="Ver repositorio"
+          >
+            <AiFillGithub size={16} />
+            Ver repositorio
+          </a>
           <h5 className="text-sm w-full">Seleccione un ejemplo</h5>
 
           <button
             onClick={() =>
               loadSample(
                 "/samples/Regresion_example_1.sav",
-                "Regresion_example_1.sav",
+                "Regresion_example_1.sav"
               )
             }
             className="hover:text-blue-600 transition-colors flex gap-2 items-center text-left underline"
@@ -71,7 +86,7 @@ export const App = () => {
             onClick={() =>
               loadSample(
                 "/samples/Regresion_example_2.xls",
-                "Regresion_example_2.xls",
+                "Regresion_example_2.xls"
               )
             }
             className="hover:text-blue-600 transition-colors flex gap-2 items-center text-left underline"
