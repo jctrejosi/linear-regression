@@ -54,12 +54,12 @@ export const FileUpload = ({ setData }: FileUploadProps) => {
       </span>
 
       <span className="text-gray-400 text-sm text-center">
-        (.csv, .xlsx, .xls, .sav, .ods)
+        (.csv, .xlsx, .xls, .sav, .ods, .data)
       </span>
 
       <input
         type="file"
-        accept=".csv,.sav,.xlsx,.xls,.ods"
+        accept=".csv,.sav,.xlsx,.xls,.ods,.data"
         onChange={handleFileChange}
         className="hidden"
       />

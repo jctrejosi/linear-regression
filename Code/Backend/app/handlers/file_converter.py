@@ -29,6 +29,14 @@ def file_converter(file):
         elif ext == '.ods':
             df = pd.read_excel(temp_path, engine='odf')
 
+        elif ext == '.data':
+            try:
+                df = pd.read_csv(temp_path)
+                if df.shape[1] == 1:
+                    raise ValueError("posible separador incorrecto")
+            except Exception:
+                df = pd.read_csv(temp_path, sep=None, engine='python')
+
         else:
             raise ValueError(f"Tipo de archivo no soportado: {ext}")
 
