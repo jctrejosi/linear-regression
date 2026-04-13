@@ -5,13 +5,72 @@ import type { TableFile } from "./@types";
 import { LinealRegresion } from "./pages/LinealRegression";
 import { AiFillGithub, AiOutlinePaperClip } from "react-icons/ai";
 import { convert_file } from "./pages/LinealRegression/services/convert_file";
+import axios from "axios";
+
+/* =========================
+   servicio health
+========================= */
+const api_health = async (): Promise<boolean> => {
+  try {
+    const res = await axios.get("/health");
+    return res.status === 200;
+  } catch {
+    return false;
+  }
+};
+
+/* =========================
+   loader screen
+========================= */
+const LoadingScreen = () => {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 gap-4">
+      <div className="w-12 h-12 border-4 border-gray-300 border-t-black rounded-full animate-spin" />
+      <p className="text-gray-600 text-sm">Iniciando backend, espere...</p>
+    </div>
+  );
+};
 
 export const App = () => {
+  const [backendReady, setBackendReady] = useState(false);
   const [dataTable, setDataTable] = useState<TableFile | undefined>(undefined);
   const [dataEditable, setDataEditable] = useState<TableFile | undefined>(
     undefined
   );
 
+  /* =========================
+     polling health check
+  ========================= */
+  useEffect(() => {
+    // eslint-disable-next-line prefer-const
+    let interval: ReturnType<typeof setInterval>;
+
+    const checkBackend = async () => {
+      const ok = await api_health();
+      if (ok) {
+        setBackendReady(true);
+        clearInterval(interval);
+      }
+    };
+
+    checkBackend();
+    interval = setInterval(checkBackend, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  /* =========================
+     sincronizar tabla editable
+  ========================= */
+  useEffect(() => {
+    if (dataTable) {
+      setDataEditable(dataTable);
+    }
+  }, [dataTable]);
+
+  /* =========================
+     cargar ejemplo
+  ========================= */
   const loadSample = async (path: string, filename: string) => {
     try {
       const res = await fetch(path);
@@ -19,9 +78,6 @@ export const App = () => {
 
       const blob = await res.blob();
       const file = new File([blob], filename);
-
-      const formData = new FormData();
-      formData.append("file", file);
 
       const table = await convert_file(file);
       setDataTable(table);
@@ -31,42 +87,43 @@ export const App = () => {
     }
   };
 
-  useEffect(() => {
-    if (dataTable) {
-      setDataEditable(dataTable);
-    }
-  }, [dataTable]);
+  /* =========================
+     pantalla de carga
+  ========================= */
+  if (!backendReady) {
+    return <LoadingScreen />;
+  }
 
+  /* =========================
+     app normal
+  ========================= */
   return (
     <div className="bg-gray-100 min-h-screen p-6">
       <div className="relative mx-auto flex flex-col gap-6 max-w-7xl 2xl:max-w-[1600px] lg:pr-72">
-        {/* =========================
-            ejemplos
-        ========================= */}
         <div
           className="
-        bg-white
-        flex flex-col md:flex-row lg:flex-col
-        gap-3 text-gray-500
-        border border-gray-300 p-4 rounded-lg
-        lg:absolute lg:top-4 lg:right-4
-      "
+          bg-white
+          flex flex-col md:flex-row lg:flex-col
+          gap-3 text-gray-500
+          border border-gray-300 p-4 rounded-lg
+          lg:absolute lg:top-4 lg:right-4
+        "
         >
           <a
             href="https://github.com/tu_usuario/tu_repo"
             target="_blank"
             rel="noopener"
             className="
-        flex items-center gap-1
-        text-white underline text-xs
-        bg-gray-800 hover:bg-gray-700
-        px-2 py-1 rounded
-      "
-            aria-label="Ver repositorio"
+              flex items-center gap-1
+              text-white underline text-xs
+              bg-gray-800 hover:bg-gray-700
+              px-2 py-1 rounded
+            "
           >
             <AiFillGithub size={16} />
             Ver repositorio
           </a>
+
           <h5 className="text-sm w-full">Seleccione un ejemplo</h5>
 
           <button
@@ -96,9 +153,6 @@ export const App = () => {
           </button>
         </div>
 
-        {/* =========================
-            carga y acciones
-        ========================= */}
         <div className="bg-white p-6 rounded-lg shadow flex flex-col gap-6">
           <FileUpload
             setData={(data) => {
@@ -111,9 +165,6 @@ export const App = () => {
           </div>
         </div>
 
-        {/* =========================
-            tabla editable
-        ========================= */}
         <div className="bg-white p-6 rounded-lg shadow overflow-x-auto">
           <EditableTable
             columns={dataEditable?.columns || []}
