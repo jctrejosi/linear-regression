@@ -1,10 +1,11 @@
-import { EditableTable } from "@/pages/LinealRegression/components/EditableTable";
-import { FileUpload } from "@/pages/LinealRegression/components/FileUpload";
+import { EditableTable } from "@/modules/LinealRegression/components/EditableTable";
+import { FileUpload } from "@/modules/LinealRegression/components/FileUpload";
 import { useEffect, useState } from "react";
 import type { TableFile } from "./@types";
-import { LinealRegresion } from "./pages/LinealRegression";
+import { LinealRegresion } from "./modules/LinealRegression";
 import { AiFillGithub, AiOutlinePaperClip } from "react-icons/ai";
-import { convert_file } from "./pages/LinealRegression/services/convert_file";
+import { convert_file } from "./modules/LinealRegression/services/convert_file";
+import { TimeSeriesForecast } from "./modules/TimeSeriesForecast";
 import axios from "axios";
 
 /* =========================
@@ -162,6 +163,7 @@ export const App = () => {
 
           <div className="flex flex-wrap gap-4 justify-center">
             <LinealRegresion data={dataEditable} />
+            <TimeSeriesForecast data={dataEditable} />
           </div>
         </div>
 
