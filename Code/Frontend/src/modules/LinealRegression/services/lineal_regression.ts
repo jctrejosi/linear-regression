@@ -1,4 +1,4 @@
-import axios from "axios";
+import { statsApi } from "@/services/axios";
 import type { RegressionResponse } from "../types";
 
 type DataSend = {
@@ -9,7 +9,7 @@ type DataSend = {
 
 export const set_regression = async (data: DataSend) => {
   try {
-    const res = await axios.post<RegressionResponse>("api/v1.0/regression", {
+    const res = await statsApi.post<RegressionResponse>("api/v1.0/regression", {
       ...data,
     });
     return res.data;

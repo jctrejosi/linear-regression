@@ -1,4 +1,4 @@
-import axios from "axios";
+import { statsApi } from "@/services/axios";
 import type { RegressionResponse } from "../types";
 
 type LlmApiResponse = {
@@ -8,13 +8,13 @@ type LlmApiResponse = {
 };
 
 export async function query_llm(
-  regressionResult: RegressionResponse,
+  regressionResult: RegressionResponse
 ): Promise<string> {
   if (!regressionResult?.ok) {
     throw new Error("resultado de regresión inválido");
   }
 
-  const res = await axios.post<LlmApiResponse>("/api/v1.0/llm", {
+  const res = await statsApi.post<LlmApiResponse>("/api/v1.0/llm", {
     result: regressionResult,
   });
 

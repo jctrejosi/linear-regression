@@ -1,12 +1,14 @@
-import axios from "axios";
+import { forecastApi } from "@/services/axios";
+import type { FineTuningResponse } from "../types";
 
-interface FineTuningPayload {
+export interface FineTuningPayload {
   model_name: string;
-  data: Record<string, string | number | boolean>[];
+  data: Record<string, unknown>[];
 }
 
-export const fine_tuning = async (payload: FineTuningPayload) => {
-  const res = await axios.post("/fine_tuning", payload);
-
+export const fine_tuning = async (
+  payload: FineTuningPayload
+): Promise<FineTuningResponse> => {
+  const res = await forecastApi.post("/fine_tuning", payload);
   return res.data;
 };
