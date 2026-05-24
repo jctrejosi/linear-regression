@@ -1,9 +1,13 @@
 import os
+import math
 import tempfile
 import pandas as pd
 import pyreadstat
 
-def file_converter(file):
+PREVIEW_ROWS = 100
+
+
+def file_converter(file, page=1, page_size=PREVIEW_ROWS):
     ext = os.path.splitext(file.filename)[1].lower()
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_file:
@@ -11,50 +15,131 @@ def file_converter(file):
         temp_path = temp_file.name
 
     try:
-        if ext == '.sav':
+        # =========================
+        # lectura archivo
+        # =========================
+
+        if ext == ".sav":
             df, meta = pyreadstat.read_sav(temp_path)
 
-        elif ext == '.csv':
+        elif ext == ".csv":
             df = pd.read_csv(temp_path)
 
-        elif ext == '.xlsx':
-            print('entró por acá')
-            # Formato moderno de Excel
-            df = pd.read_excel(temp_path, engine='openpyxl')
+        elif ext == ".xlsx":
+            df = pd.read_excel(
+                temp_path,
+                engine="openpyxl"
+            )
 
-        elif ext == '.xls':
-            # Formato antiguo de Excel (requiere xlrd==1.2.0)
-            df = pd.read_excel(temp_path, engine='xlrd')
+        elif ext == ".xls":
+            df = pd.read_excel(
+                temp_path,
+                engine="xlrd"
+            )
 
-        elif ext == '.ods':
-            df = pd.read_excel(temp_path, engine='odf')
+        elif ext == ".ods":
+            df = pd.read_excel(
+                temp_path,
+                engine="odf"
+            )
 
-        elif ext == '.data':
+        elif ext == ".data":
             try:
                 df = pd.read_csv(temp_path)
+
                 if df.shape[1] == 1:
-                    raise ValueError("posible separador incorrecto")
+                    raise ValueError(
+                        "posible separador incorrecto"
+                    )
+
             except Exception:
-                df = pd.read_csv(temp_path, sep=None, engine='python')
+                df = pd.read_csv(
+                    temp_path,
+                    sep=None,
+                    engine="python"
+                )
 
         else:
-            raise ValueError(f"Tipo de archivo no soportado: {ext}")
+            raise ValueError(
+                f"Tipo de archivo no soportado: {ext}"
+            )
 
-        # Validación de contenido
+        # =========================
+        # validaciones
+        # =========================
+
         if df.empty:
-            raise ValueError("El archivo fue leído pero no contiene datos.")
+            raise ValueError(
+                "El archivo fue leído pero no contiene datos."
+            )
 
-        columnas = df.columns.tolist()
-        data_json = df.fillna("").values.tolist()  # Limpia NaN para evitar errores en el front
+        # =========================
+        # limpiar NaN
+        # =========================
+
+        df = df.fillna("")
+
+        # =========================
+        # paginación
+        # =========================
+
+        total_rows = len(df)
+        total_columns = len(df.columns)
+
+        total_pages = max(
+            1,
+            math.ceil(total_rows / page_size)
+        )
+
+        page = max(1, min(page, total_pages))
+
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        paginated_df = df.iloc[start:end]
+
+        # =========================
+        # metadata
+        # =========================
+
+        approx_memory_mb = round(
+            df.memory_usage(deep=True).sum() / (1024 * 1024),
+            2
+        )
+
+        # =========================
+        # respuesta
+        # =========================
 
         return {
             "ok": True,
-            "columns": columnas,
-            "data": data_json
+
+            "columns": df.columns.tolist(),
+
+            "data": paginated_df.values.tolist(),
+
+            "meta": {
+                "page": page,
+                "page_size": page_size,
+
+                "total_rows": total_rows,
+                "total_columns": total_columns,
+
+                "total_pages": total_pages,
+
+                "memory_mb": approx_memory_mb,
+
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }
         }
 
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {
+            "ok": False,
+            "error": str(e)
+        }
 
     finally:
-        os.remove(temp_path)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
