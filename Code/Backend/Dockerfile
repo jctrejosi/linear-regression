@@ -9,4 +9,6 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "main:app"]
+# Render inyecta la variable PORT (por defecto 10000).
+# Se usa ${PORT:-5000} para que siga funcionando en local con docker run -p 5002:5000.
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT:-5000} main:app"]
